@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiDataSource {
   final String baseUrl;
@@ -63,7 +62,7 @@ class ApiDataSource {
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-        'tipo': tipo,
+        'tipo': tipo.toLowerCase(), // Aseguramos minúsculas para el backend
         'latitud': latitud,
         'longitud': longitud,
         'nota_voz': notaVoz,
@@ -71,10 +70,22 @@ class ApiDataSource {
       }),
     );
 
-    if (response.statusCode == 201) {
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      if (response.body.isEmpty) return {'status': 'ok'};
       return jsonDecode(response.body);
     }
-    throw Exception('Error creando reporte');
+    
+    // Manejo de errores sin fallar por FormatException
+    if (response.body.isNotEmpty) {
+      try {
+        final Map<String, dynamic> errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['error'] ?? 'Error del servidor (${response.statusCode})');
+      } catch (_) {
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    }
+    
+    throw Exception('Error del servidor sin respuesta (${response.statusCode})');
   }
 
   Future<Map<String, dynamic>> getResumen({required String token}) async {

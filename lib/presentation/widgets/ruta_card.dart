@@ -22,97 +22,79 @@ class RutaCard extends StatelessWidget {
 
   Color get _color {
     switch (seguridad) {
-      case 'verde':
-        return Colors.green;
-      case 'amarillo':
-        return Colors.orange;
-      case 'rojo':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData get _icon {
-    switch (seguridad) {
-      case 'verde':
-        return Icons.check_circle;
-      case 'amarillo':
-        return Icons.warning;
-      case 'rojo':
-        return Icons.dangerous;
-      default:
-        return Icons.help;
+      case 'verde': return Colors.green;
+      case 'amarillo': return Colors.orange;
+      case 'rojo': return Colors.red;
+      default: return Colors.grey;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      borderOnForeground: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: _color.withOpacity(0.5), width: 1.5),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _color.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          )
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_icon, color: _color, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // Barra lateral de color
+              Container(width: 5, color: _color),
+              const SizedBox(width: 10),
+              // Contenido
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         nombre,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '${distanciaKm.toStringAsFixed(1)} km · ${tiempoMinutos} min',
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: Colors.grey[700], fontSize: 11),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    seguridad.toUpperCase(),
-                    style: TextStyle(
-                      color: _color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onSelect,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _color,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Seleccionar'),
               ),
-            ),
-          ],
+              // Botón de acción con ancho fijo para prevenir el error de layout
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: SizedBox(
+                  width: 50,
+                  height: 30,
+                  child: TextButton(
+                    onPressed: onSelect,
+                    style: TextButton.styleFrom(
+                      backgroundColor: _color,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    child: const Text('Ir', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

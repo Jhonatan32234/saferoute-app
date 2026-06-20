@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
-import 'home_page.dart';
+import 'main_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,6 +16,24 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _recordarDatos = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCredencialesGuardadas();
+  }
+
+  Future<void> _cargarCredencialesGuardadas() async {
+    final auth = context.read<AuthProvider>();
+    final creds = await auth.getCredencialesGuardadas();
+    if (creds['email'] != null && creds['password'] != null) {
+      setState(() {
+        _emailController.text = creds['email']!;
+        _passwordController.text = creds['password']!;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -31,18 +49,21 @@ class _LoginPageState extends State<LoginPage> {
     final success = await auth.login(
       _emailController.text.trim(),
       _passwordController.text,
+      recordar: _recordarDatos,
     );
 
     if (success && mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -54,7 +75,6 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
                   Icon(
                     Icons.route,
                     size: 80,
@@ -71,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Navegación segura para Chiapas',
+                    'Sistema de Predicción de Riesgos Viales\npara Flotas en Chiapas',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey,
@@ -79,7 +99,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Email
                   AppTextField(
                     controller: _emailController,
                     label: 'Email',
@@ -93,7 +112,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password
                   AppTextField(
                     controller: _passwordController,
                     label: 'Contraseña',
@@ -105,34 +123,79 @@ class _LoginPageState extends State<LoginPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
-
-                  // Error
-                  Consumer<AuthProvider>(
-                    builder: (_, auth, __) {
-                      if (auth.error != null) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            auth.error!,
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
+                  
+                  // Nuevo Checkbox para recordar datos
+                  CheckboxListTile(
+                    value: _recordarDatos,
+                    onChanged: (val) => setState(() => _recordarDatos = val ?? false),
+                    title: const Text('Recordar mis datos', style: TextStyle(fontSize: 14)),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
                   ),
 
-                  // Botón
-                  Consumer<AuthProvider>(
-                    builder: (_, auth, __) {
-                      return AppButton(
-                        label: 'Iniciar Sesión',
-                        onPressed: auth.isLoading ? null : _login,
-                        isLoading: auth.isLoading,
-                      );
-                    },
+                  const SizedBox(height: 16),
+
+                  if (auth.error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                auth.error!,
+                                style: const TextStyle(color: Colors.red, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  AppButton(
+                    label: 'Iniciar Sesión',
+                    onPressed: auth.isLoading ? null : _login,
+                    isLoading: auth.isLoading,
+                    icon: Icons.login,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Credenciales de prueba',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'admin@saferoute.mx / admin123',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        ),
+                        Text(
+                          'taxista@ejemplo.com / conductor123',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
