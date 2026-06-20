@@ -8,29 +8,33 @@ import '../../domain/entities/notificacion.dart';
 
 class NotificacionProvider extends ChangeNotifier {
   final String baseUrl;
-  final String token;
-
+  String _token;
+  
   List<Notificacion> _notificaciones = [];
   WebSocketChannel? _channel;
   bool _conectado = false;
-  String? _ultimaZonaEnviada;
   String? _currentRutaId;
+  String? _ultimaZonaKey;
   Timer? _pingTimer;
   Timer? _reconnectTimer;
+
+  NotificacionProvider({required this.baseUrl, required String token}) : _token = token;
+
+  set token(String nuevoToken) => _token = nuevoToken;
+  String get token => _token;
 
   List<Notificacion> get notificaciones => _notificaciones;
   int get sinLeer => _notificaciones.where((n) => !n.leida).length;
   bool get conectado => _conectado;
 
-  NotificacionProvider({required this.baseUrl, required this.token});
-
   Future<void> cargarHistorial() async {
+    if (_token.isEmpty) return;
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/user/notificaciones'),
         headers: {
-          'Authorization': 'Bearer $token',
-          'ngrok-skip-browser-warning': 'true',
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
         },
       );
 
@@ -61,128 +65,76 @@ class NotificacionProvider extends ChangeNotifier {
   }
 
   Future<void> actualizarZonasCobertura(List<Map<String, dynamic>> zonas) async {
-    if (zonas.isEmpty) return;
+    if (zonas.isEmpty || _token.isEmpty) return;
 
-    // Verificar si es la misma zona que ya enviamos
-    if (zonas.length == 1) {
-      final zona = zonas.first;
-      final key = "${zona['zona_nombre']}_${zona['latitud']}_${zona['longitud']}_${zona['radio_km']}";
-      if (_ultimaZonaEnviada == key) {
-        debugPrint('⏭️ Zona duplicada, omitiendo: $key');
-        return;
-      }
-      _ultimaZonaEnviada = key;
-    }
+    final String zonaKey = jsonEncode(zonas.first); 
+    if (_ultimaZonaKey == zonaKey && zonas.length == 1) return;
+    _ultimaZonaKey = zonaKey;
 
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/user/zonas'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $_token',
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
         },
         body: jsonEncode({'zonas': zonas}),
       );
 
       if (response.statusCode == 200) {
         debugPrint('✅ Cobertura sincronizada: ${zonas.length} puntos');
-      } else {
-        debugPrint('⚠️ Error sincronización (${response.statusCode}): ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Error de red zonas: $e');
+      debugPrint('❌ Error red zonas: $e');
     }
   }
 
   void escucharRuta(String rutaId, {List<Map<String, dynamic>>? puntosGeograficos}) {
     if (_currentRutaId == rutaId && _conectado) return;
+    if (_token.isEmpty) return;
 
-    debugPrint("🔄 Alertas inteligentes: $rutaId");
     _currentRutaId = rutaId;
     _desconectarWS();
-    _cancelReconnect();
-
-    if (puntosGeograficos != null && puntosGeograficos.isNotEmpty) {
-      actualizarZonasCobertura(puntosGeograficos);
-    }
+    
+    if (puntosGeograficos != null) actualizarZonasCobertura(puntosGeograficos);
 
     try {
       final baseUri = Uri.parse(baseUrl);
       final wsUri = baseUri.replace(
         scheme: baseUri.isScheme('https') ? 'wss' : 'ws',
         path: '/ws/alertas/$rutaId',
-        queryParameters: {'ngrok-skip-browser-warning': 'true'},
       );
 
-      _channel = IOWebSocketChannel.connect(
-        wsUri,
-        headers: {
-          'ngrok-skip-browser-warning': 'true',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
+      _channel = IOWebSocketChannel.connect(wsUri, headers: {'Authorization': 'Bearer $_token'});
       _conectado = true;
 
       _channel!.stream.listen(
-        (message) {
-          try {
-            final data = jsonDecode(message);
-            _procesarMensajeWS(data);
-          } catch (e) {
-            debugPrint("⚠️ Error WS: $e");
-          }
-        },
-        onDone: () {
-          _conectado = false;
-          notifyListeners();
-          _intentarReconexion(rutaId);
-        },
-        onError: (error) {
-          _conectado = false;
-          notifyListeners();
-          _intentarReconexion(rutaId);
-        },
+        (msg) => _procesarMensajeWS(jsonDecode(msg)),
+        onDone: () { _conectado = false; _intentarReconexion(rutaId); notifyListeners(); },
+        onError: (err) { _conectado = false; _intentarReconexion(rutaId); notifyListeners(); },
       );
 
       _pingTimer?.cancel();
-      _pingTimer = Timer.periodic(const Duration(seconds: 25), (t) {
-        if (_conectado) _channel?.sink.add('ping');
-      });
-
+      _pingTimer = Timer.periodic(const Duration(seconds: 25), (t) => _channel?.sink.add('ping'));
       notifyListeners();
-    } catch (e) {
-      _conectado = false;
-      notifyListeners();
-    }
+    } catch (_) {}
   }
 
   void desconectarRuta({List<Map<String, dynamic>>? puntosFallback}) {
     _currentRutaId = null;
     _desconectarWS();
-    _cancelReconnect();
-    
-    // En lugar de enviar [], enviamos la zona de fallback (ej: ubicación actual)
-    if (puntosFallback != null && puntosFallback.isNotEmpty) {
-      actualizarZonasCobertura(puntosFallback);
-    }
-    
+    if (puntosFallback != null) actualizarZonasCobertura(puntosFallback);
     notifyListeners();
   }
 
   void _procesarMensajeWS(Map<String, dynamic> data) {
-    final tipoMsg = data['tipo']?.toString();
-    if (tipoMsg == 'ping' || tipoMsg == 'pong') return;
-
-    if (tipoMsg == 'historial_inicial') {
+    if (data['tipo'] == 'ping' || data['tipo'] == 'pong') return;
+    if (data['tipo'] == 'historial_inicial') {
       final List list = data['notificaciones'] ?? [];
       _notificaciones = list.map((item) => _mapJsonToNotificacion(item)).toList();
       notifyListeners();
       return;
     }
-
-    debugPrint("🔔 Alerta recibida. Recargando historial...");
     cargarHistorial();
   }
 
@@ -192,31 +144,18 @@ class NotificacionProvider extends ChangeNotifier {
     _reconnectTimer = Timer(const Duration(seconds: 5), () => escucharRuta(rutaId));
   }
 
-  void _cancelReconnect() => _reconnectTimer?.cancel();
-
   Future<void> marcarLeida(String id) async {
     final index = _notificaciones.indexWhere((n) => n.id == id);
     if (index != -1 && !_notificaciones[index].leida) {
       _notificaciones[index].leida = true;
       notifyListeners();
-
       try {
-        final uri = Uri.parse('$baseUrl/api/user/notificaciones/marcar').replace(
-          queryParameters: {'id': id},
-        );
-
         await http.put(
-          uri,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          },
+          Uri.parse('$baseUrl/api/user/notificaciones/marcar?id=$id'),
+          headers: {'Authorization': 'Bearer $_token', 'Content-Type': 'application/json'},
           body: jsonEncode({'leida': true}),
         );
-      } catch (e) {
-        debugPrint("❌ Error marcar leída: $e");
-      }
+      } catch (_) {}
     }
   }
 
@@ -225,12 +164,5 @@ class NotificacionProvider extends ChangeNotifier {
     _channel?.sink.close();
     _channel = null;
     _conectado = false;
-  }
-
-  @override
-  void dispose() {
-    _desconectarWS();
-    _reconnectTimer?.cancel();
-    super.dispose();
   }
 }

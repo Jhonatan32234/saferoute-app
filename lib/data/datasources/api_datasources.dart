@@ -62,7 +62,7 @@ class ApiDataSource {
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-        'tipo': tipo.toLowerCase(), // Aseguramos minúsculas para el backend
+        'tipo': tipo.toLowerCase(),
         'latitud': latitud,
         'longitud': longitud,
         'nota_voz': notaVoz,
@@ -75,17 +75,15 @@ class ApiDataSource {
       return jsonDecode(response.body);
     }
     
-    // Manejo de errores sin fallar por FormatException
     if (response.body.isNotEmpty) {
       try {
         final Map<String, dynamic> errorBody = jsonDecode(response.body);
-        throw Exception(errorBody['error'] ?? 'Error del servidor (${response.statusCode})');
+        throw Exception(errorBody['error'] ?? 'Error del servidor');
       } catch (_) {
         throw Exception('Error del servidor: ${response.statusCode}');
       }
     }
-    
-    throw Exception('Error del servidor sin respuesta (${response.statusCode})');
+    throw Exception('Error del servidor (${response.statusCode})');
   }
 
   Future<Map<String, dynamic>> getResumen({required String token}) async {

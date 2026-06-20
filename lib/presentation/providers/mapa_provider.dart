@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:saferoute_app/presentation/providers/notificacion_provider.dart';
 import '../../data/datasources/api_datasources.dart';
+import 'notificacion_provider.dart';
 
 class MapaProvider extends ChangeNotifier {
   final ApiDataSource api;
@@ -13,7 +13,6 @@ class MapaProvider extends ChangeNotifier {
 
   MapaProvider({required this.api, required String token}) : _token = token;
 
-  // Setter para actualizar el token sin recrear el Provider
   set token(String nuevoToken) {
     _token = nuevoToken;
   }
@@ -54,11 +53,7 @@ class MapaProvider extends ChangeNotifier {
   String get textoDestino => _textoDestino;
   bool get usarUbicacionActualPersistente => _usarUbicacionActualPersistente;
 
-  void setZonaInicializada(bool valor) {
-    _zonaInicializada = valor;
-  }
   bool get zonaInicializada => _zonaInicializada;
-
 
   void guardarTextosBusqueda({String? origen, String? destino, bool? usarUbicacion}) {
     if (origen != null) _textoOrigen = origen;
@@ -81,29 +76,8 @@ class MapaProvider extends ChangeNotifier {
       final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
       _ubicacionActual = LatLng(pos.latitude, pos.longitude);
       notifyListeners();
-
-      // <-- AGREGAR: Inicializar zona solo si no se ha hecho antes
-      if (!_zonaInicializada) {
-        _inicializarZonaUbicacion();
-      }
     } catch (e) {
       debugPrint("GPS error: $e");
-    }
-  }
-
-  // <-- AGREGAR ESTE MÉTODO NUEVO
-  void _inicializarZonaUbicacion() {
-    // Solo enviar la zona una vez al inicio
-    if (_zonaInicializada) return;
-
-    try {
-      // Obtener el NotificacionProvider del contexto
-      // Nota: Esto asume que tienes acceso al context o al provider
-      // Si no, puedes pasar el NotificacionProvider como parámetro
-      debugPrint('📍 Inicializando zona de ubicación: ${_ubicacionActual.latitude}, ${_ubicacionActual.longitude}');
-      _zonaInicializada = true;
-    } catch (e) {
-      debugPrint('❌ Error inicializando zona: $e');
     }
   }
 
@@ -119,7 +93,6 @@ class MapaProvider extends ChangeNotifier {
 
     notiProvider.actualizarZonasCobertura(zona);
     _zonaInicializada = true;
-    debugPrint('✅ Zona de ubicación inicializada');
   }
 
   Future<void> cargarClusters() async {
@@ -129,7 +102,6 @@ class MapaProvider extends ChangeNotifier {
       String urlBase = api.baseUrl.replaceAll('/api', '');
       final response = await api.client.get(
         Uri.parse('$urlBase/clusters'),
-        headers: {'ngrok-skip-browser-warning': 'true'},
       );
 
       if (response.statusCode == 200) {
@@ -155,7 +127,6 @@ class MapaProvider extends ChangeNotifier {
     _rutaSeleccionada = null;
     _polilineas = [];
     _mostrarSoloSeleccionada = false;
-
     _origenBusqueda = LatLng(origenLat, origenLon);
     _destinoBusqueda = LatLng(destinoLat, destinoLon);
     notifyListeners();
