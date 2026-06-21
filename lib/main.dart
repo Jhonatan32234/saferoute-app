@@ -8,6 +8,8 @@ import 'presentation/providers/reporte_provider.dart';
 import 'presentation/providers/notificacion_provider.dart';
 import 'presentation/pages/login_page.dart';
 import 'presentation/pages/main_screen.dart';
+import 'presentation/widgets/usb_debug_blocker.dart';
+import 'presentation/widgets/fake_gps_blocker.dart';
 import 'package:http/http.dart' as http;
 import 'data/datasources/api_datasources.dart';
 import 'data/repositories/reporte_repository_impl.dart';
@@ -23,20 +25,14 @@ class SafeRouteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defaultApiUrl = dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
+    final defaultApiUrl = dotenv.maybeGet('API_BASE_URL') ?? 'http://localhost:8080';
 
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        
-        // Usamos el parámetro 'previous' para evitar recrear el provider 
-        // y perder el estado (como la ubicación GPS) al loguearse.
         ChangeNotifierProxyProvider<AuthProvider, MapaProvider>(
           create: (_) => MapaProvider(
-            api: ApiDataSource(
-              baseUrl: defaultApiUrl,
-              client: http.Client(),
-            ),
+            api: ApiDataSource(baseUrl: defaultApiUrl, client: http.Client()),
             token: '',
           ),
           update: (_, auth, previous) {
@@ -45,28 +41,20 @@ class SafeRouteApp extends StatelessWidget {
             return provider;
           },
         ),
-
         ChangeNotifierProxyProvider<AuthProvider, ReporteProvider>(
           create: (_) => ReporteProvider(
             repository: ReporteRepositoryImpl(
-              api: ApiDataSource(
-                baseUrl: defaultApiUrl,
-                client: http.Client(),
-              ),
+              api: ApiDataSource(baseUrl: defaultApiUrl, client: http.Client()),
             ),
             token: '',
           ),
           update: (_, auth, previous) => ReporteProvider(
-            repository: auth.reporteRepository, 
-            token: auth.token ?? ''
+              repository: auth.reporteRepository,
+              token: auth.token ?? ''
           ),
         ),
-
         ChangeNotifierProxyProvider<AuthProvider, NotificacionProvider>(
-          create: (_) => NotificacionProvider(
-            baseUrl: defaultApiUrl,
-            token: '',
-          ),
+          create: (_) => NotificacionProvider(baseUrl: defaultApiUrl, token: ''),
           update: (_, auth, previous) => NotificacionProvider(
             baseUrl: auth.api.baseUrl,
             token: auth.token ?? '',
@@ -79,12 +67,27 @@ class SafeRouteApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const LoginPage(),
-          '/main': (context) => const MainScreen(),
-        },
+        // Envolvemos la app en ambos bloqueadores de seguridad
+        home: const UsbDebugBlocker(
+          child: FakeGpsBlocker(
+            child: _AppRouter(),
+          ),
+        ),
       ),
     );
+  }
+}
+
+class _AppRouter extends StatelessWidget {
+  const _AppRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    if (auth.isLoggedIn) {
+      return const MainScreen();
+    }
+    return const LoginPage();
   }
 }

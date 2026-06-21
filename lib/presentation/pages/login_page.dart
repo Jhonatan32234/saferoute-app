@@ -168,35 +168,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
 
                   const SizedBox(height: 24),
-
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Credenciales de prueba',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'admin@saferoute.mx / admin123',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                        ),
-                        Text(
-                          'taxista@ejemplo.com / conductor123',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),

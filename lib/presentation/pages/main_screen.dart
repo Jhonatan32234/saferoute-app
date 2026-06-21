@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../providers/auth_provider.dart';
 import '../providers/mapa_provider.dart';
 import '../providers/reporte_provider.dart';
@@ -96,13 +99,11 @@ class _MainScreenState extends State<MainScreen> {
         }
 
         if (zonas.length > 30) {
-          // Tomar solo 30 puntos distribuidos uniformemente
           final zonasFiltradas = <Map<String, dynamic>>[];
           final stepFiltro = (zonas.length / 30).ceil();
           for (int i = 0; i < zonas.length; i += stepFiltro) {
             zonasFiltradas.add(zonas[i]);
           }
-          // Asegurar incluir la última
           if (zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
             zonasFiltradas.add(zonas.last);
           }
@@ -129,6 +130,19 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
 
+    // Solicitud de permisos de notificación para Android 13+
+    if (Platform.isAndroid) {
+      try {
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      } catch (e) {
+        debugPrint('Error solicitando permisos de notificación: $e');
+      }
+    }
+
     await mapaProvider.inicializarUbicacion();
     await mapaProvider.cargarClusters();
     await notiProvider.cargarHistorial();
@@ -153,8 +167,6 @@ class _MainScreenState extends State<MainScreen> {
   void _inicializarZonaUbicacion() {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
-
-    // Solo si no se ha inicializado antes
     if (!mapaProvider.zonaInicializada) {
       mapaProvider.actualizarZonaUbicacion(notiProvider);
     }
@@ -421,109 +433,68 @@ class _MainScreenState extends State<MainScreen> {
     return polylines;
   }
 
+  Color _colorRuta(String seguridad) {
+    switch (seguridad) {
+      case 'rojo': return Colors.red;
+      case 'naranja': return Colors.orange;
+      default: return Colors.green;
+    }
+  }
+
   List<Marker> _buildMarkers(MapaProvider mapaProvider, NotificacionProvider notiProvider) {
     final markers = <Marker>[];
     markers.add(Marker(
       point: mapaProvider.ubicacionActual,
-      width: 40, height: 40,
-      child: const Icon(Icons.local_shipping, color: Colors.blue, size: 30),
+      width: 40,
+      height: 40,
+      child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
     ));
 
-    for (final n in notiProvider.notificaciones) {
-      if (!n.leida) {
-        markers.add(Marker(
-          point: LatLng(n.latitud, n.longitud),
-          width: 50, height: 50,
-          child: GestureDetector(
-            onTap: () => _mostrarInfoAlerta(n),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Icon(Icons.location_on, color: Colors.orange, size: 50),
-                const Positioned(
-                  top: 8,
-                  child: Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+    for (var cluster in mapaProvider.clusters) {
+      markers.add(Marker(
+        point: LatLng(
+          (cluster['latitud'] as num).toDouble(), 
+          (cluster['longitud'] as num).toDouble()
+        ),
+        width: 45,
+        height: 45,
+        child: GestureDetector(
+          onTap: () => _mostrarDetalleCluster(cluster),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(Icons.location_on, color: _colorSeguridad(cluster['nivelSeguridad']), size: 45),
+              Positioned(
+                top: 8,
+                child: Text(
+                  '${cluster['cantidad']}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ));
-      }
-    }
-
-    if (mapaProvider.origenBusqueda != null) {
-      markers.add(Marker(
-        point: mapaProvider.origenBusqueda!,
-        width: 30, height: 30,
-        child: const Icon(Icons.trip_origin, color: Colors.green, size: 24),
-      ));
-    }
-    if (mapaProvider.destinoBusqueda != null) {
-      markers.add(Marker(
-        point: mapaProvider.destinoBusqueda!,
-        width: 30, height: 30,
-        child: const Icon(Icons.location_on, color: Colors.red, size: 28),
-      ));
-    }
-
-    for (final c in mapaProvider.clusters) {
-      final riesgo = (c['riesgo_combinado'] ?? 0).toDouble();
-      markers.add(Marker(
-        point: LatLng((c['lat'] ?? 0).toDouble(), (c['lon'] ?? 0).toDouble()),
-        width: 16, height: 16,
-        child: Container(decoration: BoxDecoration(
-          color: (riesgo > 15 ? Colors.red : riesgo > 5 ? Colors.orange : riesgo > 0.5 ? Colors.amber : Colors.green).withOpacity(0.6),
-          shape: BoxShape.circle,
-        )),
+        ),
       ));
     }
     return markers;
   }
 
-  void _mostrarInfoAlerta(dynamic n) {
+  Color _colorSeguridad(String nivel) {
+    switch (nivel) {
+      case 'ALTO': return Colors.red;
+      case 'MEDIO': return Colors.orange;
+      default: return Colors.green;
+    }
+  }
+
+  void _mostrarDetalleCluster(Map<String, dynamic> cluster) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-            const SizedBox(width: 10),
-            const Text('Alerta en Ruta'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(n.mensaje, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (n.notaVoz.isNotEmpty) 
-              Text('Detalles: ${n.notaVoz}', style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
-            const SizedBox(height: 4),
-            Text('Recibido: ${n.timestamp.hour}:${n.timestamp.minute.toString().padLeft(2, '0')}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _moverAPunto(LatLng(n.latitud, n.longitud));
-            }, 
-            child: const Text('Ir al lugar')
-          ),
-        ],
+      builder: (_) => AlertDialog(
+        title: Text('Zona: ${cluster['nivelSeguridad']} RIESGO'),
+        content: Text('Se han reportado ${cluster['cantidad']} incidentes en esta área recientemente.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendido'))],
       ),
     );
   }
-
-  Color _colorRuta(String seguridad) {
-    switch (seguridad) {
-      case 'verde': return Colors.green;
-      case 'amarillo': return Colors.orange;
-      case 'rojo': return Colors.red;
-      default: return Colors.grey;
-    }
-  }
 }
-

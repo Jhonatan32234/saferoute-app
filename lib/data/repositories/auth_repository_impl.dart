@@ -22,11 +22,11 @@ class AuthRepositoryImpl implements IAuthRepository {
 
   @override
   Future<void> logout() async {
-    // Solo borramos la sesión, no las credenciales guardadas para el login
     await _storage.delete(key: 'jwt_token');
     await _storage.delete(key: 'nombre');
     await _storage.delete(key: 'tipo');
     await _storage.delete(key: 'user_id');
+    await _storage.delete(key: 'login_time');
   }
 
   @override
@@ -34,6 +34,15 @@ class AuthRepositoryImpl implements IAuthRepository {
 
   @override
   Future<String?> getNombre() async => _storage.read(key: 'nombre');
+
+  // Nuevos métodos para gestionar el tiempo de sesión
+  Future<void> saveLoginTime(String time) async {
+    await _storage.write(key: 'login_time', value: time);
+  }
+
+  Future<String?> getLoginTime() async {
+    return await _storage.read(key: 'login_time');
+  }
 
   @override
   Future<void> guardarCredenciales(String email, String password) async {
