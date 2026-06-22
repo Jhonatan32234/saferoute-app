@@ -37,6 +37,10 @@ class MapaProvider extends ChangeNotifier {
   String _textoDestino = '';
   bool _usarUbicacionActualPersistente = true;
 
+  // Stream para seguimiento en tiempo real
+  StreamSubscription<Position>? _posicionStream;
+  bool _rastreoActivo = false;
+
   LatLng get ubicacionActual => _ubicacionActual;
   List<Map<String, dynamic>> get rutas => _rutas;
   List<Map<String, dynamic>> get clusters => _clusters;
@@ -54,6 +58,7 @@ class MapaProvider extends ChangeNotifier {
   bool get usarUbicacionActualPersistente => _usarUbicacionActualPersistente;
 
   bool get zonaInicializada => _zonaInicializada;
+  bool get rastreoActivo => _rastreoActivo;
 
   void guardarTextosBusqueda({String? origen, String? destino, bool? usarUbicacion}) {
     if (origen != null) _textoOrigen = origen;
@@ -73,12 +78,44 @@ class MapaProvider extends ChangeNotifier {
         if (permiso != LocationPermission.whileInUse && permiso != LocationPermission.always) return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       _ubicacionActual = LatLng(pos.latitude, pos.longitude);
       notifyListeners();
+
+      // Iniciar rastreo continuo
+      _iniciarRastreoGPS();
+      
+      await cargarClusters();
     } catch (e) {
       debugPrint("GPS error: $e");
     }
+  }
+
+  void _iniciarRastreoGPS() {
+    _rastreoActivo = true;
+    _posicionStream?.cancel();
+    
+    _posicionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Actualizar cada 10 metros
+      ),
+    ).listen(
+      (Position posicion) {
+        if (!_rastreoActivo) return;
+        _ubicacionActual = LatLng(posicion.latitude, posicion.longitude);
+        notifyListeners();
+      },
+      onError: (error) {
+        debugPrint('Error GPS stream: $error');
+      },
+    );
+  }
+
+  void detenerRastreoGPS() {
+    _rastreoActivo = false;
+    _posicionStream?.cancel();
+    notifyListeners();
   }
 
   void actualizarZonaUbicacion(NotificacionProvider notiProvider) {
@@ -187,5 +224,11 @@ class MapaProvider extends ChangeNotifier {
       _destinoBusqueda = LatLng(lat, lon);
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _posicionStream?.cancel();
+    super.dispose();
   }
 }

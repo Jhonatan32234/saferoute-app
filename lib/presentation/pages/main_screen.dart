@@ -28,6 +28,8 @@ class _MainScreenState extends State<MainScreen> {
   bool _mostrandoBarraReportes = false;
   String? _tipoReporteSeleccionado;
   bool _online = true;
+  LatLng? _puntoEnfocado; 
+  String? _ultimaRutaIdEscuchada; // Control de redundancia para WebSocket
 
   @override
   void initState() {
@@ -53,6 +55,8 @@ class _MainScreenState extends State<MainScreen> {
     if (mounted) {
       final reporteProvider = context.read<ReporteProvider>();
       final mapaProvider = context.read<MapaProvider>();
+      final notiProvider = context.read<NotificacionProvider>();
+      
       if (reporteProvider.ultimoResultado != null) {
         setState(() {
           _mostrandoBarraReportes = false;
@@ -60,6 +64,7 @@ class _MainScreenState extends State<MainScreen> {
         });
         if (reporteProvider.ultimoResultado == 'éxito') {
           mapaProvider.cargarClusters();
+          notiProvider.cargarHistorial();
         }
       }
     }
@@ -70,8 +75,15 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
 
+    final String idActual = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
+
+    // FIX: Evita reiniciar el WebSocket y recalcular zonas en cada paso del GPS (10m)
+    if (idActual == _ultimaRutaIdEscuchada) return;
+    _ultimaRutaIdEscuchada = idActual;
+
     if (mapaProvider.rutaSeleccionada != null) {
-      final String id = mapaProvider.rutaSeleccionada!['id']?.toString() ?? 'sin-ruta';
+      setState(() => _puntoEnfocado = null);
+      
       final String nombreRuta = mapaProvider.rutaSeleccionada!['nombre'] ?? 'Ruta';
       
       final index = mapaProvider.rutas.indexOf(mapaProvider.rutaSeleccionada!);
@@ -104,12 +116,12 @@ class _MainScreenState extends State<MainScreen> {
           for (int i = 0; i < zonas.length; i += stepFiltro) {
             zonasFiltradas.add(zonas[i]);
           }
-          if (zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
+          if (zonasFiltradas.isNotEmpty && zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
             zonasFiltradas.add(zonas.last);
           }
-          notiProvider.escucharRuta(id, puntosGeograficos: zonasFiltradas);
+          notiProvider.escucharRuta(idActual, puntosGeograficos: zonasFiltradas);
         } else {
-          notiProvider.escucharRuta(id, puntosGeograficos: zonas);
+          notiProvider.escucharRuta(idActual, puntosGeograficos: zonas);
         }
       }
       
@@ -130,7 +142,6 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
 
-    // Solicitud de permisos de notificación para Android 13+
     if (Platform.isAndroid) {
       try {
         final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -180,12 +191,12 @@ class _MainScreenState extends State<MainScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent, 
       builder: (_) => NotificacionesPanel(
         onNotificacionTap: (lat, lon) {
-          _moverAPunto(LatLng(lat, lon));
+          final destino = LatLng(lat, lon);
+          setState(() => _puntoEnfocado = destino);
+          _moverAPunto(destino);
         },
       ),
     );
@@ -281,6 +292,9 @@ class _MainScreenState extends State<MainScreen> {
             options: MapOptions(
               initialCenter: mapaProvider.ubicacionActual,
               initialZoom: 12,
+              onTap: (_, __) {
+                if (_puntoEnfocado != null) setState(() => _puntoEnfocado = null);
+              },
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
               ),
@@ -443,13 +457,7 @@ class _MainScreenState extends State<MainScreen> {
 
   List<Marker> _buildMarkers(MapaProvider mapaProvider, NotificacionProvider notiProvider) {
     final markers = <Marker>[];
-    markers.add(Marker(
-      point: mapaProvider.ubicacionActual,
-      width: 40,
-      height: 40,
-      child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
-    ));
-
+    
     for (var cluster in mapaProvider.clusters) {
       markers.add(Marker(
         point: LatLng(
@@ -476,6 +484,59 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ));
     }
+
+    if (mapaProvider.origenBusqueda != null) {
+      markers.add(Marker(
+        point: mapaProvider.origenBusqueda!,
+        width: 40,
+        height: 40,
+        child: const Icon(Icons.location_on, color: Colors.green, size: 35),
+      ));
+    }
+
+    if (mapaProvider.destinoBusqueda != null) {
+      markers.add(Marker(
+        point: mapaProvider.destinoBusqueda!,
+        width: 45,
+        height: 45,
+        child: const Icon(Icons.flag, color: Colors.red, size: 40),
+      ));
+    }
+
+    markers.add(Marker(
+      point: mapaProvider.ubicacionActual,
+      width: 40,
+      height: 40,
+      child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
+    ));
+
+    if (_puntoEnfocado != null) {
+      markers.add(Marker(
+        point: _puntoEnfocado!,
+        width: 100,
+        height: 100,
+        child: GestureDetector(
+          onTap: () => setState(() => _puntoEnfocado = null),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red[900],
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                ),
+                child: const Text('VER AQUÍ', 
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+              const Icon(Icons.location_on, color: Colors.red, size: 50),
+            ],
+          ),
+        ),
+      ));
+    }
+
     return markers;
   }
 

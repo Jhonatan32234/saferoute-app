@@ -48,17 +48,25 @@ class SafeRouteApp extends StatelessWidget {
             ),
             token: '',
           ),
-          update: (_, auth, previous) => ReporteProvider(
+          update: (_, auth, previous) {
+            final provider = previous ?? ReporteProvider(
               repository: auth.reporteRepository,
-              token: auth.token ?? ''
-          ),
+              token: auth.token ?? '',
+            );
+            provider.token = auth.token ?? '';
+            return provider;
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, NotificacionProvider>(
           create: (_) => NotificacionProvider(baseUrl: defaultApiUrl, token: ''),
-          update: (_, auth, previous) => NotificacionProvider(
-            baseUrl: auth.api.baseUrl,
-            token: auth.token ?? '',
-          ),
+          update: (_, auth, previous) {
+            final provider = previous ?? NotificacionProvider(
+              baseUrl: auth.api.baseUrl,
+              token: auth.token ?? '',
+            );
+            provider.token = auth.token ?? '';
+            return provider;
+          },
         ),
       ],
       child: MaterialApp(
@@ -67,7 +75,6 @@ class SafeRouteApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        // Envolvemos la app en ambos bloqueadores de seguridad
         home: const UsbDebugBlocker(
           child: FakeGpsBlocker(
             child: _AppRouter(),
@@ -85,9 +92,22 @@ class _AppRouter extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    if (auth.isLoggedIn) {
-      return const MainScreen();
+    // Mostrar carga hasta que se complete la verificación de sesión
+    if (!auth.inicializado) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Iniciando sesión segura...'),
+            ],
+          ),
+        ),
+      );
     }
-    return const LoginPage();
+
+    return auth.isLoggedIn ? const MainScreen() : const LoginPage();
   }
 }

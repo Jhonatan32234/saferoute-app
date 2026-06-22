@@ -1,7 +1,7 @@
 name: saferoute_app
 description: SafeRoute - Navegación Segura para Flotas en Chiapas
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -36,6 +36,9 @@ dependencies:
   
   # Agregado para notificaciones
   flutter_local_notifications: ^17.2.2
+
+  # Intents para Android
+  android_intent_plus: ^5.0.2
 
 
 dev_dependencies:

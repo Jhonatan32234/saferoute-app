@@ -44,3 +44,23 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# --- SEGURIDAD Y ARCHIVOS LOCALES ---
+# Firma de Android (Keystores y contraseñas)
+*.keystore
+*.jks
+*.p12
+*.key
+key.properties
+
+# Propiedades locales del SDK y entorno
+local.properties
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Archivos de configuración de iOS sensibles
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
