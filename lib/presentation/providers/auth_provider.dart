@@ -1,15 +1,16 @@
+// lib/presentation/providers/auth_provider.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:injectable/injectable.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../domain/repositories/reporte_repository.dart';
 import '../../data/datasources/api_datasources.dart';
-import '../../data/repositories/auth_repository_impl.dart';
-import '../../data/repositories/reporte_repository_impl.dart';
 
+@injectable
 class AuthProvider extends ChangeNotifier {
-  late final ApiDataSource api;
-  late final AuthRepositoryImpl authRepository;
-  late final ReporteRepositoryImpl reporteRepository;
+  final ApiDataSource api;
+  final IAuthRepository authRepository;
+  final IReporteRepository reporteRepository;
 
   String? _token;
   String? _nombre;
@@ -27,11 +28,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoggedIn => _token != null && !sesionExpirada;
   String? get error => _error;
 
-  AuthProvider() {
-    final baseUrl = dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
-    api = ApiDataSource(baseUrl: baseUrl, client: http.Client());
-    authRepository = AuthRepositoryImpl(api: api);
-    reporteRepository = ReporteRepositoryImpl(api: api);
+  AuthProvider(this.api, this.authRepository, this.reporteRepository) {
     _cargarSesion();
   }
 
@@ -51,7 +48,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _cargarSesion() async {
     try {
       final permiteAutoLogin = await authRepository.getAutoLogin();
-      
+
       if (!permiteAutoLogin) {
         _inicializado = true;
         notifyListeners();
@@ -60,7 +57,7 @@ class AuthProvider extends ChangeNotifier {
 
       final token = await authRepository.getToken();
       final loginTimeStr = await authRepository.getLoginTime();
-      
+
       if (token != null && loginTimeStr != null) {
         final loginTime = DateTime.parse(loginTimeStr);
         if (DateTime.now().difference(loginTime) > const Duration(hours: 12)) {
@@ -99,24 +96,24 @@ class AuthProvider extends ChangeNotifier {
       _nombre = data['nombre'];
       _tipo = data['tipo'];
       _ultimaActividad = DateTime.now();
-      
+
       await authRepository.saveLoginTime(_ultimaActividad!.toIso8601String());
       await authRepository.setAutoLogin(recordar);
-      
+
       if (recordar) {
         await authRepository.guardarCredenciales(email, password);
       } else {
         await authRepository.guardarCredenciales(email, "");
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       final errorStr = e.toString();
-      
-      if (errorStr.contains('SocketException') || 
-          errorStr.contains('timeout') || 
+
+      if (errorStr.contains('SocketException') ||
+          errorStr.contains('timeout') ||
           errorStr.contains('Failed host lookup') ||
           errorStr.contains('Connection refused')) {
         return await _intentoLoginOffline(email, password);
@@ -133,14 +130,14 @@ class AuthProvider extends ChangeNotifier {
     final offlineCreds = await authRepository.obtenerCredencialesOffline();
     final offlineToken = await authRepository.getOfflineToken();
 
-    if (offlineCreds['email']?.trim() == email.trim() && 
-        offlineCreds['password'] == password && 
+    if (offlineCreds['email']?.trim() == email.trim() &&
+        offlineCreds['password'] == password &&
         offlineToken != null) {
-      
+
       _token = offlineToken;
       _nombre = await authRepository.getOfflineNombre();
       _tipo = await authRepository.getOfflineTipo();
-      
+
       final loginTimeStr = await authRepository.getLoginTime();
       _ultimaActividad = loginTimeStr != null ? DateTime.parse(loginTimeStr) : DateTime.now();
 
@@ -168,5 +165,10 @@ class AuthProvider extends ChangeNotifier {
     _ultimaActividad = null;
     _inicializado = true;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }

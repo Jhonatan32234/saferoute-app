@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class BarraReportesWidget extends StatelessWidget {
   final Function(String tipo) onTipoSeleccionado;
@@ -18,36 +19,36 @@ class BarraReportesWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 100, // Incrementado un poco para mejor respiro visual
+      height: 100.h,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: Colors.white10),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 10.r,
+            offset: Offset(0, 4.h),
           )
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Row(
             children: _tipos.map((tipo) => Padding(
-              padding: const EdgeInsets.only(right: 20), // Espaciado consistente entre elementos
+              padding: EdgeInsets.only(right: 20.w),
               child: GestureDetector(
                 onTap: () => onTipoSeleccionado(tipo['tipo'] as String),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(8.r),
                       decoration: BoxDecoration(
                         color: (tipo['color'] as Color).withOpacity(0.15),
                         shape: BoxShape.circle,
@@ -55,15 +56,15 @@ class BarraReportesWidget extends StatelessWidget {
                       child: Icon(
                         tipo['icono'] as IconData, 
                         color: tipo['color'] as Color, 
-                        size: 28
+                        size: 28.r
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6.h),
                     Text(
                       tipo['label'] as String,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white, 
-                        fontSize: 10,
+                        fontSize: 10.sp,
                         fontWeight: FontWeight.w500
                       ),
                     ),

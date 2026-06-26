@@ -1,11 +1,17 @@
+// lib/data/datasources/api_datasources.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:injectable/injectable.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+@lazySingleton
 class ApiDataSource {
-  final String baseUrl;
   final http.Client client;
+  final DotEnv dotenv;
 
-  ApiDataSource({required this.baseUrl, required this.client});
+  String get baseUrl => dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
+
+  ApiDataSource(this.client, this.dotenv);
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await client.post(
@@ -74,7 +80,7 @@ class ApiDataSource {
       if (response.body.isEmpty) return {'status': 'ok'};
       return jsonDecode(response.body);
     }
-    
+
     if (response.body.isNotEmpty) {
       try {
         final Map<String, dynamic> errorBody = jsonDecode(response.body);

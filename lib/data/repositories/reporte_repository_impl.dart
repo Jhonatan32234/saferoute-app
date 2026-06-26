@@ -1,13 +1,15 @@
+import 'dart:convert';
+import 'package:injectable/injectable.dart';
 import '../../domain/entities/reporte.dart';
 import '../../domain/repositories/reporte_repository.dart';
 import '../datasources/api_datasources.dart';
 import '../models/reporte_model.dart';
-import 'dart:convert';
 
+@LazySingleton(as: IReporteRepository)
 class ReporteRepositoryImpl implements IReporteRepository {
   final ApiDataSource _api;
 
-  ReporteRepositoryImpl({required ApiDataSource api}) : _api = api;
+  ReporteRepositoryImpl(this._api);
 
   @override
   Future<Reporte> crearReporte({

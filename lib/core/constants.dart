@@ -1,3 +1,4 @@
+// lib/core/constants.dart
 /// Constantes de la aplicación SafeRoute
 class AppConstants {
   AppConstants._();
@@ -54,18 +55,5 @@ class AppConstants {
 // > 15 = rojo
 }
 
-/// Colores de la aplicación
-class AppColors {
-  AppColors._();
-
-  static const int primary = 0xFF1A1A2E;
-  static const int accent = 0xFFE94560;
-  static const int success = 0xFF4CAF50;
-  static const int warning = 0xFFF0A500;
-  static const int danger = 0xFFE94560;
-  static const int info = 0xFF2196F3;
-
-  static const int riesgoVerde = 0xFF4CAF50;
-  static const int riesgoAmarillo = 0xFFF0A500;
-  static const int riesgoRojo = 0xFFE94560;
-}
+// ✅ ELIMINAR la clase AppColors de aquí
+// Ya no está, solo existe en core/theme/app_colors.dart

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -7,7 +8,7 @@ class AppButton extends StatelessWidget {
   final Color? color;
   final IconData? icon;
   final bool isOutlined;
-  final double? width; // Ancho opcional
+  final double? width;
 
   const AppButton({
     super.key,
@@ -33,8 +34,7 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final buttonColor = color ?? Theme.of(context).colorScheme.primary;
-    // Si no se especifica ancho, se adapta al contenido en lugar de ser infinito por defecto
-    final minSize = Size(width ?? 80, 48);
+    final minSize = Size(width?.w ?? 80.w, 48.h);
 
     if (isOutlined) {
       return OutlinedButton(
@@ -44,7 +44,7 @@ class AppButton extends StatelessWidget {
           foregroundColor: buttonColor,
           side: BorderSide(color: buttonColor),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(8.r),
           ),
         ),
         child: _buildChild(buttonColor),
@@ -57,7 +57,7 @@ class AppButton extends StatelessWidget {
         backgroundColor: buttonColor,
         minimumSize: minSize,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
         ),
       ),
       child: _buildChild(Colors.white),
@@ -66,25 +66,31 @@ class AppButton extends StatelessWidget {
 
   Widget _buildChild(Color textColor) {
     if (isLoading) {
-      return const SizedBox(
-        height: 20,
-        width: 20,
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      return SizedBox(
+        height: 20.r,
+        width: 20.r,
+        child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
       );
     }
 
     if (icon != null) {
       return Row(
-        mainAxisSize: MainAxisSize.min, // Importante para que no crezca infinito
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: textColor),
-          const SizedBox(width: 8),
-          Text(label),
+          Icon(icon, size: 20.r, color: textColor),
+          SizedBox(width: 8.w),
+          Text(
+            label,
+            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+          ),
         ],
       );
     }
 
-    return Text(label);
+    return Text(
+      label,
+      style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+    );
   }
 }

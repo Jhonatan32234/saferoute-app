@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../providers/notificacion_provider.dart';
 import '../../domain/entities/notificacion.dart';
 
@@ -12,16 +13,16 @@ class NotificacionesPanel extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white, // Fondo blanco para máxima claridad
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: _getTipoColor(n.tipo)),
-            const SizedBox(width: 10),
-            const Text(
+            Icon(Icons.warning_amber_rounded, color: _getTipoColor(n.tipo), size: 24.r),
+            SizedBox(width: 10.w),
+            Text(
               'Detalle de Alerta',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18.sp),
             ),
           ],
         ),
@@ -31,44 +32,45 @@ class NotificacionesPanel extends StatelessWidget {
           children: [
             Text(
               n.mensaje, 
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold, 
-                fontSize: 17, 
+                fontSize: 17.sp, 
                 color: Colors.black87
               )
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             _infoRow(Icons.category, 'Tipo: ${n.tipo.toUpperCase()}'),
             _infoRow(Icons.access_time, 'Hora: ${n.timestamp.hour}:${n.timestamp.minute.toString().padLeft(2, '0')}'),
             if (n.notaVoz.isNotEmpty)
               _infoRow(Icons.description, 'Descripción: ${n.notaVoz}'),
-            const SizedBox(height: 20),
-            const Text(
+            SizedBox(height: 20.h),
+            Text(
               'El marcador aparecerá resaltado en el mapa para tu referencia.', 
-              style: TextStyle(fontSize: 12, color: Colors.blueGrey, fontStyle: FontStyle.italic),
+              style: TextStyle(fontSize: 12.sp, color: Colors.blueGrey, fontStyle: FontStyle.italic),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cerrar', style: TextStyle(color: Colors.grey[700])),
+            child: Text('Cerrar', style: TextStyle(color: Colors.grey[700], fontSize: 14.sp)),
           ),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.pop(context); // Cierra dialogo
-              Navigator.pop(context); // Cierra panel
+              Navigator.pop(context);
+              Navigator.pop(context);
               if (onNotificacionTap != null) {
                 onNotificacionTap!(n.latitud, n.longitud);
               }
             },
-            icon: const Icon(Icons.location_searching),
-            label: const Text('Localizar'),
+            icon: Icon(Icons.location_searching, size: 18.r),
+            label: Text('Localizar', style: TextStyle(fontSize: 14.sp)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[800],
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
             ),
           ),
         ],
@@ -78,15 +80,15 @@ class NotificacionesPanel extends StatelessWidget {
 
   Widget _infoRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: 6.h),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.blueGrey[400]),
-          const SizedBox(width: 10),
+          Icon(icon, size: 18.r, color: Colors.blueGrey[400]),
+          SizedBox(width: 10.w),
           Expanded(
             child: Text(
               text, 
-              style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500)
+              style: TextStyle(fontSize: 14.sp, color: Colors.black87, fontWeight: FontWeight.w500)
             )
           ),
         ],
@@ -109,40 +111,40 @@ class NotificacionesPanel extends StatelessWidget {
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: 0.75.sh,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8F9FA), // Gris ultra claro para fondo del panel
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+            margin: EdgeInsets.only(top: 12.h),
+            width: 40.w, height: 4.h,
+            decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2.r)),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            padding: EdgeInsets.fromLTRB(20.w, 10.h, 20.w, 20.h),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Alertas de Seguridad', 
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)
+                      style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.black87)
                     ),
                     Text(
                       '${notiProvider.sinLeer} alertas por revisar', 
-                      style: TextStyle(color: Colors.blueGrey[600], fontSize: 13)
+                      style: TextStyle(color: Colors.blueGrey[600], fontSize: 13.sp)
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.black54),
+                  icon: Icon(Icons.close_rounded, color: Colors.black54, size: 24.r),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -150,14 +152,14 @@ class NotificacionesPanel extends StatelessWidget {
           ),
           const Divider(height: 1),
           if (notifications.isEmpty)
-            const Expanded(
+            Expanded(
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No hay alertas en tu zona', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                    Icon(Icons.notifications_off_outlined, size: 64.r, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text('No hay alertas en tu zona', style: TextStyle(color: Colors.grey, fontSize: 16.sp)),
                   ],
                 ),
               ),
@@ -165,7 +167,7 @@ class NotificacionesPanel extends StatelessWidget {
           else
             Flexible(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: 8.h),
                 itemCount: notifications.length,
                 itemBuilder: (context, index) {
                   final n = notifications[index];
@@ -173,17 +175,17 @@ class NotificacionesPanel extends StatelessWidget {
                     opacity: n.leida ? 0.7 : 1.0,
                     child: Card(
                       color: Colors.white,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
                       elevation: n.leida ? 0 : 2,
                       shadowColor: Colors.black12,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12.r),
                         side: n.leida ? BorderSide(color: Colors.grey[200]!) : BorderSide.none,
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.only(left: 16, right: 8, top: 4, bottom: 4),
+                        contentPadding: EdgeInsets.only(left: 16.w, right: 8.w, top: 4.h, bottom: 4.h),
                         leading: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: EdgeInsets.all(8.r),
                           decoration: BoxDecoration(
                             color: _getTipoColor(n.tipo).withOpacity(0.1),
                             shape: BoxShape.circle,
@@ -191,7 +193,7 @@ class NotificacionesPanel extends StatelessWidget {
                           child: Icon(
                             _getTipoColor(n.tipo) == Colors.red ? Icons.error_outline : Icons.warning_amber_rounded, 
                             color: _getTipoColor(n.tipo), 
-                            size: 24
+                            size: 24.r
                           ),
                         ),
                         title: Text(
@@ -200,25 +202,25 @@ class NotificacionesPanel extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: n.leida ? FontWeight.normal : FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 14.sp,
                             color: Colors.black87,
                           )
                         ),
                         subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
+                          padding: EdgeInsets.only(top: 4.h),
                           child: Text(
                             'Hora de reporte • ${n.timestamp.hour}:${n.timestamp.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                            style: TextStyle(fontSize: 11.sp, color: Colors.black54),
                           ),
                         ),
                         onTap: () => _mostrarDetalles(context, n),
                         trailing: n.leida 
-                          ? const IconButton(
-                              icon: Icon(Icons.check_circle, color: Colors.green, size: 24),
+                          ? IconButton(
+                              icon: Icon(Icons.check_circle, color: Colors.green, size: 24.r),
                               onPressed: null,
                             )
                           : IconButton(
-                              icon: const Icon(Icons.radio_button_unchecked, color: Colors.blue),
+                              icon: Icon(Icons.radio_button_unchecked, color: Colors.blue, size: 24.r),
                               tooltip: 'Marcar como leída',
                               onPressed: () => notiProvider.marcarLeida(n.id),
                             ),

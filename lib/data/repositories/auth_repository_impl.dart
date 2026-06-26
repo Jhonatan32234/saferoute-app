@@ -1,29 +1,30 @@
+// lib/data/repositories/auth_repository_impl.dart
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:injectable/injectable.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/api_datasources.dart';
 
+@LazySingleton(as: IAuthRepository)
 class AuthRepositoryImpl implements IAuthRepository {
   final ApiDataSource _api;
   final FlutterSecureStorage _storage;
 
-  AuthRepositoryImpl({required ApiDataSource api})
-      : _api = api,
-        _storage = const FlutterSecureStorage();
+  AuthRepositoryImpl(this._api, this._storage);
 
   @override
   Future<Map<String, dynamic>> login(String email, String password) async {
     final data = await _api.login(email, password);
-    
+
     // Sesión activa (se borra en logout)
     await _storage.write(key: 'jwt_token', value: data['token']);
     await _storage.write(key: 'nombre', value: data['nombre']);
     await _storage.write(key: 'tipo', value: data['tipo']);
     await _storage.write(key: 'user_id', value: data['user_id'].toString());
-    
+
     // Respaldo Offline (persiste tras logout)
     await guardarDatosOffline(data['token'], data['nombre'], data['tipo']);
     await guardarCredencialesOffline(email, password);
-    
+
     return data;
   }
 
@@ -35,7 +36,6 @@ class AuthRepositoryImpl implements IAuthRepository {
     await _storage.delete(key: 'user_id');
     await _storage.delete(key: 'login_time');
     await _storage.delete(key: 'auto_login');
-    // Mantenemos las llaves offline_* para el respaldo
   }
 
   @override
@@ -47,8 +47,16 @@ class AuthRepositoryImpl implements IAuthRepository {
   @override
   Future<String?> getTipo() async => _storage.read(key: 'tipo');
 
-  Future<void> saveLoginTime(String time) async => await _storage.write(key: 'login_time', value: time);
-  Future<String?> getLoginTime() async => await _storage.read(key: 'login_time');
+  // ✅ IMPLEMENTAR MÉTODOS FALTANTES
+  @override
+  Future<void> saveLoginTime(String time) async {
+    await _storage.write(key: 'login_time', value: time);
+  }
+
+  @override
+  Future<String?> getLoginTime() async {
+    return await _storage.read(key: 'login_time');
+  }
 
   @override
   Future<void> guardarCredenciales(String email, String password) async {
@@ -65,9 +73,15 @@ class AuthRepositoryImpl implements IAuthRepository {
   }
 
   @override
-  Future<void> setAutoLogin(bool value) async => await _storage.write(key: 'auto_login', value: value.toString());
+  Future<void> setAutoLogin(bool value) async {
+    await _storage.write(key: 'auto_login', value: value.toString());
+  }
+
   @override
-  Future<bool> getAutoLogin() async => (await _storage.read(key: 'auto_login')) == 'true';
+  Future<bool> getAutoLogin() async {
+    final value = await _storage.read(key: 'auto_login');
+    return value == 'true';
+  }
 
   @override
   Future<void> guardarDatosOffline(String token, String nombre, String tipo) async {
@@ -78,8 +92,10 @@ class AuthRepositoryImpl implements IAuthRepository {
 
   @override
   Future<String?> getOfflineToken() async => _storage.read(key: 'offline_token');
+
   @override
   Future<String?> getOfflineNombre() async => _storage.read(key: 'offline_nombre');
+
   @override
   Future<String?> getOfflineTipo() async => _storage.read(key: 'offline_tipo');
 

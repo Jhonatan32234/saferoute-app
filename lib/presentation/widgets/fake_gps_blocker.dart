@@ -1,6 +1,9 @@
+// lib/presentation/widgets/fake_gps_blocker.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/security/fake_gps_checker.dart';
 
 class FakeGpsBlocker extends StatefulWidget {
@@ -32,18 +35,16 @@ class _FakeGpsBlockerState extends State<FakeGpsBlocker> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-verificar cuando la app vuelve al primer plano
     if (state == AppLifecycleState.resumed) {
       _checkFakeGps();
     }
   }
 
   Future<void> _checkFakeGps() async {
-    // Si ya estamos bloqueados, no mostramos el loading de nuevo para evitar parpadeo
     if (!_isBlocked) setState(() => _checking = true);
-    
+
     final result = await FakeGpsChecker.checkFakeGps();
-    
+
     if (mounted) {
       setState(() {
         _isBlocked = result != "CLEAN";
@@ -56,14 +57,29 @@ class _FakeGpsBlockerState extends State<FakeGpsBlocker> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     if (_checking && !_isBlocked) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: AppColors.slate50,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Color(0xFF8E0000)),
-              SizedBox(height: 16),
-              Text('Verificando integridad del GPS...'),
+              SizedBox(
+                width: 40.r,
+                height: 40.r,
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                  strokeWidth: 4.r,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'Verificando integridad del GPS...',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: AppColors.slate600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
@@ -72,45 +88,71 @@ class _FakeGpsBlockerState extends State<FakeGpsBlocker> with WidgetsBindingObse
 
     if (_isBlocked) {
       return PopScope(
-        canPop: false, // Bloquea el botón físico de atrás
+        canPop: false,
         child: Scaffold(
-          backgroundColor: const Color(0xFF8E0000),
+          backgroundColor: AppColors.danger,
           body: SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.gpp_bad, size: 100, color: Colors.white),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'ENTORNO NO SEGURO',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
+                padding: EdgeInsets.all(32.r),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 400.w),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.gpp_bad,
+                        size: 100.r,
+                        color: AppColors.white,
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSecurityInfo(),
-                    const SizedBox(height: 32),
-                    _buildRetryButton(),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: () => SystemNavigator.pop(),
-                      icon: const Icon(Icons.exit_to_app),
-                      label: const Text('SALIR DE LA APP'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.2),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      SizedBox(height: 24.h),
+                      Text(
+                        'ENTORNO NO SEGURO',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 22.sp,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                        ),
                       ),
-                    ),
-                  ],
+                      SizedBox(height: 24.h),
+                      _buildSecurityInfo(),
+                      SizedBox(height: 32.h),
+                      _buildRetryButton(),
+                      SizedBox(height: 24.h),
+                      GestureDetector(
+                        onTap: () => SystemNavigator.pop(),  // ✅ Usar onTap
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: AppColors.white.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.exit_to_app,
+                                size: 20.r,
+                                color: AppColors.white,
+                              ),
+                              SizedBox(width: 8.w),
+                              Text(
+                                'SALIR DE LA APP',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -124,23 +166,31 @@ class _FakeGpsBlockerState extends State<FakeGpsBlocker> with WidgetsBindingObse
 
   Widget _buildSecurityInfo() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.r),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+        color: AppColors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.white.withOpacity(0.2)),
       ),
       child: Column(
         children: [
-          const Text(
+          Text(
             'GPS Falso Detectado',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(
+              color: AppColors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16.sp,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
           Text(
             'SafeRoute ha detectado que se están utilizando coordenadas simuladas. Detalle técnico: $_culpableInfo',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+            style: TextStyle(
+              color: AppColors.white.withOpacity(0.8),
+              fontSize: 14.sp,
+              height: 1.5,
+            ),
           ),
         ],
       ),
@@ -148,16 +198,35 @@ class _FakeGpsBlockerState extends State<FakeGpsBlocker> with WidgetsBindingObse
   }
 
   Widget _buildRetryButton() {
-    return ElevatedButton.icon(
-      onPressed: _checkFakeGps,
-      icon: const Icon(Icons.refresh),
-      label: const Text('REINTENTAR VERIFICACIÓN'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF8E0000),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+    return GestureDetector(
+      onTap: _checkFakeGps,  // ✅ Usar onTap
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 18.h),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.white.withOpacity(0.3),
+              blurRadius: 16.r,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.refresh, size: 20.r, color: AppColors.danger),
+            SizedBox(width: 8.w),
+            Text(
+              'REINTENTAR VERIFICACIÓN',
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w800,
+                color: AppColors.danger,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class RutaCard extends StatelessWidget {
   final String nombre;
@@ -32,64 +33,61 @@ class RutaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: EdgeInsets.only(bottom: 6.h),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8.r),
         border: Border.all(color: _color.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            blurRadius: 4.r,
+            offset: Offset(0, 2.h),
           )
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8.r),
         child: IntrinsicHeight(
           child: Row(
             children: [
-              // Barra lateral de color
-              Container(width: 5, color: _color),
-              const SizedBox(width: 10),
-              // Contenido
+              Container(width: 5.w, color: _color),
+              SizedBox(width: 10.w),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: EdgeInsets.symmetric(vertical: 8.h),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         nombre,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '${distanciaKm.toStringAsFixed(1)} km · ${tiempoMinutos} min',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 11),
+                        style: TextStyle(color: Colors.grey[700], fontSize: 11.sp),
                       ),
                     ],
                   ),
                 ),
               ),
-              // Botón de acción con ancho fijo para prevenir el error de layout
               Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: EdgeInsets.all(8.r),
                 child: SizedBox(
-                  width: 50,
-                  height: 30,
+                  width: 50.w,
+                  height: 30.h,
                   child: TextButton(
                     onPressed: onSelect,
                     style: TextButton.styleFrom(
                       backgroundColor: _color,
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.r)),
                     ),
-                    child: const Text('Ir', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text('Ir', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),

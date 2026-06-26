@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../providers/mapa_provider.dart';
 import 'ruta_card.dart';
 
@@ -10,53 +11,51 @@ class RutaPillWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final mapaProvider = context.watch<MapaProvider>();
 
-    // Estado: cargando
     if (mapaProvider.cargandoRutas) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         decoration: _pillDecoration(),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-            SizedBox(width: 12),
-            Text('Calculando rutas...', style: TextStyle(fontSize: 13)),
+            SizedBox(width: 18.r, height: 18.r, child: const CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 12.w),
+            Text('Calculando rutas...', style: TextStyle(fontSize: 13.sp)),
           ],
         ),
       );
     }
 
-    // Estado: ruta seleccionada (viaje iniciado)
     if (mapaProvider.mostrarSoloSeleccionada && mapaProvider.rutaSeleccionada != null) {
       final ruta = mapaProvider.rutaSeleccionada!;
       return Container(
-        padding: const EdgeInsets.all(10),
+        padding: EdgeInsets.all(10.r),
         decoration: _pillDecoration(),
         child: Row(
           children: [
             Container(
-              width: 4, height: 32,
+              width: 4.w, height: 32.h,
               decoration: BoxDecoration(
                 color: _colorSeguridad(ruta['seguridad'] ?? 'verde'),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(2.r),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(ruta['nombre'] ?? 'Ruta', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(ruta['nombre'] ?? 'Ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
                   Text(
                     '${(ruta['distancia_km'] ?? 0).toStringAsFixed(1)} km · ${ruta['tiempo_minutos'] ?? 0} min',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11.sp),
                   ),
                 ],
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+              icon: Icon(Icons.close, size: 20.r, color: Colors.grey),
               onPressed: () => mapaProvider.mostrarTodasLasRutas(),
               tooltip: 'Ver todas las opciones',
             ),
@@ -65,30 +64,28 @@ class RutaPillWidget extends StatelessWidget {
       );
     }
 
-    // Estado: múltiples rutas encontradas
     if (mapaProvider.rutas.isNotEmpty) {
       return Container(
-        constraints: const BoxConstraints(maxHeight: 280),
-        padding: const EdgeInsets.all(10),
+        constraints: BoxConstraints(maxHeight: 280.h),
+        padding: EdgeInsets.all(10.r),
         decoration: _pillDecoration(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                const Text('Opciones de Ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('Opciones de Ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
                 const Spacer(),
-                // CORRECCIÓN: Ahora este botón limpia la búsqueda por completo
                 GestureDetector(
                   onTap: () => mapaProvider.limpiarBusqueda(),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4.0),
-                    child: Icon(Icons.close, size: 20, color: Colors.grey),
+                  child: Padding(
+                    padding: EdgeInsets.all(4.r),
+                    child: Icon(Icons.close, size: 20.r, color: Colors.grey),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
@@ -118,8 +115,8 @@ class RutaPillWidget extends StatelessWidget {
   BoxDecoration _pillDecoration() {
     return BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+      borderRadius: BorderRadius.circular(10.r),
+      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10.r)],
     );
   }
 

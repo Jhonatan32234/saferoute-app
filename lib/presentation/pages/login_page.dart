@@ -1,5 +1,8 @@
+// lib/presentation/pages/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/theme/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
@@ -17,6 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _recordarDatos = true;
+  bool _showPassword = false;
 
   @override
   void initState() {
@@ -65,113 +69,291 @@ class _LoginPageState extends State<LoginPage> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
+      backgroundColor: AppColors.slate50,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.route,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'SafeRoute',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sistema de Predicción de Riesgos Viales\npara Flotas en Chiapas',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-
-                  AppTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    prefixIcon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Ingresa tu email';
-                      if (!v.contains('@')) return 'Email inválido';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  AppTextField(
-                    controller: _passwordController,
-                    label: 'Contraseña',
-                    prefixIcon: Icons.lock_outlined,
-                    isPassword: true,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
-                      if (v.length < 6) return 'Mínimo 6 caracteres';
-                      return null;
-                    },
-                  ),
-                  
-                  // Nuevo Checkbox para recordar datos
-                  CheckboxListTile(
-                    value: _recordarDatos,
-                    onChanged: (val) => setState(() => _recordarDatos = val ?? false),
-                    title: const Text('Recordar mis datos', style: TextStyle(fontSize: 14)),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  if (auth.error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                auth.error!,
-                                style: const TextStyle(color: Colors.red, fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  AppButton(
-                    label: 'Iniciar Sesión',
-                    onPressed: auth.isLoading ? null : _login,
-                    isLoading: auth.isLoading,
-                    icon: Icons.login,
-                  ),
-
-                  const SizedBox(height: 24),
-                ],
+        child: Stack(
+          children: [
+            // Fondo con gradiente personalizado
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFFEEF6FF), // Azul muy claro (arriba)
+                    Color(0xFFF0FDF4), // Verde muy claro (abajo)
+                  ],
+                ),
               ),
             ),
-          ),
+            // Círculo azul decorativo (esquina superior derecha)
+            Positioned(
+              top: -60.h,
+              right: -60.w,
+              child: Container(
+                width: 240.r,
+                height: 240.r,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF2563EB).withOpacity(0.06),
+                ),
+              ),
+            ),
+            // Círculo verde decorativo (esquina inferior izquierda)
+            Positioned(
+              bottom: -50.h,
+              left: -50.w,
+              child: Container(
+                width: 200.r,
+                height: 200.r,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF16A34A).withOpacity(0.06),
+                ),
+              ),
+            ),
+            // Contenido
+            Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(24.r),
+                child: Form(
+                  key: _formKey,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 400.w),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Logo Cuadrado
+                        Center(
+                          child: Container(
+                            width: 90.r,
+                            height: 90.r,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3F87BF),
+                              borderRadius: BorderRadius.circular(20.r),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 20.r,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            padding: EdgeInsets.all(12.r),
+                            child: Image.asset(
+                              'assets/saferoute_white_nof.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 24.h),
+                        Text(
+                          'SafeRoute',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 30.sp,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.slate800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Sistema de Predicción de Riesgos Viales para flotas en Chiapas',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.slate500,
+                          ),
+                        ),
+                        SizedBox(height: 32.h),
+
+                        // Card de login
+                        Container(
+                          padding: EdgeInsets.all(24.r),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(24.r),
+                            border: Border.all(
+                              color: AppColors.slate200,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 40.r,
+                                offset: Offset(0, 8.h),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Iniciar sesión',
+                                style: TextStyle(
+                                  fontSize: 20.sp,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.slate800,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Text(
+                                'Ingresa tus credenciales',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: AppColors.slate400,
+                                ),
+                              ),
+                              SizedBox(height: 20.h),
+
+                              // Email
+                              AppTextField(
+                                controller: _emailController,
+                                label: 'Correo electrónico',
+                                prefixIcon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Ingresa tu email';
+                                  if (!v.contains('@')) return 'Email inválido';
+                                  return null;
+                                },
+                              ),
+                              SizedBox(height: 16.h),
+
+                              // Password
+                              AppTextField(
+                                controller: _passwordController,
+                                label: 'Contraseña',
+                                prefixIcon: Icons.lock_outlined,
+                                isPassword: !_showPassword,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _showPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    size: 20.r,
+                                    color: AppColors.slate400,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _showPassword = !_showPassword;
+                                    });
+                                  },
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
+                                  if (v.length < 6) return 'Mínimo 6 caracteres';
+                                  return null;
+                                },
+                              ),
+
+                              // Recordar datos
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 24.r,
+                                    height: 24.r,
+                                    child: Checkbox(
+                                      value: _recordarDatos,
+                                      onChanged: (val) =>
+                                          setState(() => _recordarDatos = val ?? false),
+                                      activeColor: const Color(0xFF2563EB),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6.r),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    'Recordar mis datos',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.slate600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 16.h),
+
+                              // Error
+                              if (auth.error != null)
+                                Container(
+                                  padding: EdgeInsets.all(12.r),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.dangerBg,
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    border: Border.all(
+                                      color: AppColors.danger.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline,
+                                        color: AppColors.danger,
+                                        size: 20.r,
+                                      ),
+                                      SizedBox(width: 8.w),
+                                      Expanded(
+                                        child: Text(
+                                          auth.error!,
+                                          style: TextStyle(
+                                            color: AppColors.danger,
+                                            fontSize: 13.sp,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (auth.error != null) SizedBox(height: 16.h),
+
+                              // Botón de login
+                              GestureDetector(
+                                onTap: auth.isLoading ? null : _login,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3F87BF), // blue-600 Tailwind
+                                    borderRadius: BorderRadius.circular(16.r),
+                                  ),
+                                  child: auth.isLoading
+                                      ? SizedBox(
+                                    width: 24.r,
+                                    height: 24.r,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.white,
+                                    ),
+                                  )
+                                      : Text(
+                                    'Entrar',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

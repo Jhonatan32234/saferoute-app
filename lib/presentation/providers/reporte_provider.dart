@@ -3,17 +3,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:injectable/injectable.dart';
 import '../../domain/repositories/reporte_repository.dart';
 
+@injectable
 class ReporteProvider extends ChangeNotifier {
   final IReporteRepository _repository;
-  String _token;
-  final _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage;
+  String _token = '';
   StreamSubscription? _connectivitySubscription;
 
-  ReporteProvider({required IReporteRepository repository, required String token})
-      : _repository = repository,
-        _token = token {
+  ReporteProvider(this._repository, this._storage) {
     _initConnectivityListener();
     sincronizarPendientes();
   }
@@ -39,12 +39,14 @@ class ReporteProvider extends ChangeNotifier {
 
   void _initConnectivityListener() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      // Si recuperamos conexión (cualquiera que no sea none)
       if (results.isNotEmpty && results.first != ConnectivityResult.none) {
         sincronizarPendientes();
       }
     });
   }
+
+  // lib/presentation/providers/reporte_provider.dart
+// En el método enviarReporte, eliminar la línea que reemplaza el texto
 
   Future<void> enviarReporte({
     required String tipo,
@@ -61,11 +63,15 @@ class ReporteProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // ✅ ELIMINAR esta línea que reemplaza el texto:
+      // notaVoz: notaVoz.trim().isEmpty ? tipo : notaVoz.trim(),
+
+      // ✅ Usar el texto directamente
       await _repository.crearReporte(
         tipo: tipo,
         latitud: latitud,
         longitud: longitud,
-        notaVoz: notaVoz.trim().isEmpty ? tipo : notaVoz.trim(),
+        notaVoz: notaVoz.trim(),  // ✅ Solo trim, sin reemplazo
         rutaId: rutaId,
         token: _token,
       );
@@ -73,13 +79,13 @@ class ReporteProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       final errorStr = e.toString();
-      if (errorStr.contains('SocketException') || 
+      if (errorStr.contains('SocketException') ||
           errorStr.contains('timeout') ||
           errorStr.contains('Failed host lookup') ||
           errorStr.contains('Connection refused')) {
-        
+
         await _guardarReporteLocal(tipo, latitud, longitud, notaVoz, rutaId);
-        _ultimoResultado = 'éxito'; // Se informa éxito porque se aseguró localmente
+        _ultimoResultado = 'éxito';
         _error = 'Reporte guardado. Se sincronizará al recuperar la conexión.';
       } else {
         _ultimoResultado = 'error';
@@ -118,58 +124,55 @@ class ReporteProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sincronizarPendientes() async {if (_sincronizando || _token.isEmpty) return;
+  Future<void> sincronizarPendientes() async {
+    if (_sincronizando || _token.isEmpty) return;
 
-  try {
-    final data = await _storage.read(key: 'reportes_pendientes');
-    if (data == null) return;
+    try {
+      final data = await _storage.read(key: 'reportes_pendientes');
+      if (data == null) return;
 
-    List<dynamic> pendientes = jsonDecode(data);
-    if (pendientes.isEmpty) return;
+      List<dynamic> pendientes = jsonDecode(data);
+      if (pendientes.isEmpty) return;
 
-    _sincronizando = true;
-    notifyListeners();
+      _sincronizando = true;
+      notifyListeners();
 
-    List<dynamic> fallidos = [];
+      List<dynamic> fallidos = [];
 
-    for (var reporte in pendientes) {
-      try {
-        await _repository.crearReporte(
-          tipo: reporte['tipo'],
-          latitud: (reporte['latitud'] as num).toDouble(),
-          longitud: (reporte['longitud'] as num).toDouble(),
-          notaVoz: reporte['nota_voz'],
-          rutaId: reporte['ruta_id'],
-          token: _token,
-        );
-      } catch (e) {
-        final errorStr = e.toString();
-        fallidos.add(reporte);
+      for (var reporte in pendientes) {
+        try {
+          await _repository.crearReporte(
+            tipo: reporte['tipo'],
+            latitud: (reporte['latitud'] as num).toDouble(),
+            longitud: (reporte['longitud'] as num).toDouble(),
+            notaVoz: reporte['nota_voz'],
+            rutaId: reporte['ruta_id'],
+            token: _token,
+          );
+        } catch (e) {
+          final errorStr = e.toString();
+          fallidos.add(reporte);
 
-        // Si detectamos que seguimos sin conexión real, detenemos el proceso
-        // para no saturar con intentos fallidos
-        if (errorStr.contains('SocketException') ||
-            errorStr.contains('timeout') ||
-            errorStr.contains('Failed host lookup') ||
-            errorStr.contains('Connection refused')) {
-          break;
+          if (errorStr.contains('SocketException') ||
+              errorStr.contains('timeout') ||
+              errorStr.contains('Failed host lookup') ||
+              errorStr.contains('Connection refused')) {
+            break;
+          }
         }
       }
-    }
 
-    // Actualizamos la lista: si se enviaron todos, borramos la llave.
-    // Si fallaron algunos, guardamos solo los restantes.
-    if (fallidos.isEmpty) {
-      await _storage.delete(key: 'reportes_pendientes');
-    } else {
-      await _storage.write(key: 'reportes_pendientes', value: jsonEncode(fallidos));
+      if (fallidos.isEmpty) {
+        await _storage.delete(key: 'reportes_pendientes');
+      } else {
+        await _storage.write(key: 'reportes_pendientes', value: jsonEncode(fallidos));
+      }
+    } catch (e) {
+      debugPrint("Error crítico de sincronización: $e");
+    } finally {
+      _sincronizando = false;
+      notifyListeners();
     }
-  } catch (e) {
-    debugPrint("Error crítico de sincronización: $e");
-  } finally {
-    _sincronizando = false;
-    notifyListeners();
-  }
   }
 
   @override

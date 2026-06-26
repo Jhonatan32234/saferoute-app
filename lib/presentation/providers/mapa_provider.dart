@@ -1,17 +1,18 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:injectable/injectable.dart';
 import '../../data/datasources/api_datasources.dart';
 import 'notificacion_provider.dart';
 
+@injectable
 class MapaProvider extends ChangeNotifier {
   final ApiDataSource api;
-  String _token;
+  String _token = '';
   bool _zonaInicializada = false;
 
-  MapaProvider({required this.api, required String token}) : _token = token;
+  MapaProvider(this.api);
 
   set token(String nuevoToken) {
     _token = nuevoToken;
@@ -21,9 +22,7 @@ class MapaProvider extends ChangeNotifier {
 
   LatLng _ubicacionActual = const LatLng(16.753, -93.115);
   List<Map<String, dynamic>> _rutas = [];
-  List<Map<String, dynamic>> _clusters = [];
   bool _cargandoRutas = false;
-  bool _cargandoClusters = false;
   String? _error;
 
   Map<String, dynamic>? _rutaSeleccionada;
@@ -43,9 +42,7 @@ class MapaProvider extends ChangeNotifier {
 
   LatLng get ubicacionActual => _ubicacionActual;
   List<Map<String, dynamic>> get rutas => _rutas;
-  List<Map<String, dynamic>> get clusters => _clusters;
   bool get cargandoRutas => _cargandoRutas;
-  bool get cargandoClusters => _cargandoClusters;
   String? get error => _error;
   Map<String, dynamic>? get rutaSeleccionada => _rutaSeleccionada;
   List<List<LatLng>> get polilineas => _polilineas;
@@ -84,8 +81,6 @@ class MapaProvider extends ChangeNotifier {
 
       // Iniciar rastreo continuo
       _iniciarRastreoGPS();
-      
-      await cargarClusters();
     } catch (e) {
       debugPrint("GPS error: $e");
     }
@@ -120,38 +115,12 @@ class MapaProvider extends ChangeNotifier {
 
   void actualizarZonaUbicacion(NotificacionProvider notiProvider) {
     if (_zonaInicializada) return;
-
-    final zona = [{
-      'zona_nombre': 'mi_ubicacion',
-      'latitud': _ubicacionActual.latitude,
-      'longitud': _ubicacionActual.longitude,
-      'radio_km': 15.0,
-    }];
-
-    notiProvider.actualizarZonasCobertura(zona);
+    // Ya no enviamos zonas de cobertura estáticas, 
+    // ahora dependemos de la telemetría enviada por WebSocket.
     _zonaInicializada = true;
   }
 
-  Future<void> cargarClusters() async {
-    _cargandoClusters = true;
-    notifyListeners();
-    try {
-      String urlBase = api.baseUrl.replaceAll('/api', '');
-      final response = await api.client.get(
-        Uri.parse('$urlBase/clusters'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _clusters = List<Map<String, dynamic>>.from(data['clusters'] ?? []);
-      }
-    } catch (e) {
-      debugPrint("Clusters error: $e");
-    } finally {
-      _cargandoClusters = false;
-      notifyListeners();
-    }
-  }
+  // Método obsoleto eliminado: cargarClusters
 
   Future<void> buscarRutas({
     required double origenLat,
@@ -224,6 +193,11 @@ class MapaProvider extends ChangeNotifier {
       _destinoBusqueda = LatLng(lat, lon);
     }
     notifyListeners();
+  }
+
+  Future<void> cargarClusters() async {
+    // Método mantenido como vacío para no romper llamadas externas si existen,
+    // pero la lógica de dibujo ya fue eliminada de la UI.
   }
 
   @override

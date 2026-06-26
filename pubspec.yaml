@@ -40,21 +40,34 @@ dependencies:
   # Intents para Android
   android_intent_plus: ^5.0.2
 
+  # Inyección de dependencias
+  get_it: ^8.0.2
+  injectable: ^2.5.0
+
+  # Responsividad
+  flutter_screenutil: ^5.9.3
+
+  google_fonts: ^6.1.0  # Agregar esta línea
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
 
+  flutter_lints: ^5.0.0
+  
+  # Generación de código para DI
+  build_runner: ^2.4.13
+  injectable_generator: ^2.6.2
+
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icono.png"
-
-  flutter_lints: ^5.0.0
+  image_path: "assets/saferoute_blue.png"
 
 flutter:
   uses-material-design: true
   assets:
     - .env
     - assets/
+    - assets/saferoute_blue.png

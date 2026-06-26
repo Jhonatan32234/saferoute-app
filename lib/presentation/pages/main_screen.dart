@@ -1,20 +1,23 @@
+// lib/presentation/pages/main_screen.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/theme/app_colors.dart';
+import '../../domain/entities/notificacion.dart';
 import '../providers/auth_provider.dart';
 import '../providers/mapa_provider.dart';
 import '../providers/reporte_provider.dart';
 import '../providers/notificacion_provider.dart';
-import '../widgets/barra_reportes_widget.dart';
 import '../widgets/ruta_pill_widget.dart';
 import '../widgets/buscador_rutas_widget.dart';
-import '../widgets/nota_voz_widget.dart';
-import '../widgets/notificaciones_panel.dart';
+import '../widgets/report_button_widget.dart';
+import '../widgets/notificaciones_panel_v2.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -25,11 +28,10 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final MapController _mapController = MapController();
-  bool _mostrandoBarraReportes = false;
-  String? _tipoReporteSeleccionado;
   bool _online = true;
-  LatLng? _puntoEnfocado; 
-  String? _ultimaRutaIdEscuchada; // Control de redundancia para WebSocket
+  LatLng? _puntoEnfocado;
+  String? _ultimaRutaIdEscuchada;
+  Timer? _telemetriaTimer;
 
   @override
   void initState() {
@@ -39,11 +41,17 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   @override
+  void dispose() {
+    _telemetriaTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     context.read<ReporteProvider>().removeListener(_onReporteCompletado);
     context.read<ReporteProvider>().addListener(_onReporteCompletado);
-    
+
     context.read<MapaProvider>().removeListener(_onRutaChanged);
     context.read<MapaProvider>().addListener(_onRutaChanged);
 
@@ -56,12 +64,8 @@ class _MainScreenState extends State<MainScreen> {
       final reporteProvider = context.read<ReporteProvider>();
       final mapaProvider = context.read<MapaProvider>();
       final notiProvider = context.read<NotificacionProvider>();
-      
+
       if (reporteProvider.ultimoResultado != null) {
-        setState(() {
-          _mostrandoBarraReportes = false;
-          _tipoReporteSeleccionado = null;
-        });
         if (reporteProvider.ultimoResultado == 'éxito') {
           mapaProvider.cargarClusters();
           notiProvider.cargarHistorial();
@@ -77,15 +81,29 @@ class _MainScreenState extends State<MainScreen> {
 
     final String idActual = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
 
-    // FIX: Evita reiniciar el WebSocket y recalcular zonas en cada paso del GPS (10m)
     if (idActual == _ultimaRutaIdEscuchada) return;
     _ultimaRutaIdEscuchada = idActual;
 
+    _telemetriaTimer?.cancel();
+
     if (mapaProvider.rutaSeleccionada != null) {
+      _telemetriaTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        notiProvider.enviarTelemetria(
+          mapaProvider.ubicacionActual.latitude,
+          mapaProvider.ubicacionActual.longitude,
+          0,
+          idActual,
+        );
+      });
+
       setState(() => _puntoEnfocado = null);
-      
+
       final String nombreRuta = mapaProvider.rutaSeleccionada!['nombre'] ?? 'Ruta';
-      
+
       final index = mapaProvider.rutas.indexOf(mapaProvider.rutaSeleccionada!);
       if (index >= 0 && index < mapaProvider.polilineas.length) {
         final List<LatLng> puntos = mapaProvider.polilineas[index];
@@ -116,23 +134,17 @@ class _MainScreenState extends State<MainScreen> {
           for (int i = 0; i < zonas.length; i += stepFiltro) {
             zonasFiltradas.add(zonas[i]);
           }
-          if (zonasFiltradas.isNotEmpty && zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
+          if (zonasFiltradas.isNotEmpty &&
+              zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
             zonasFiltradas.add(zonas.last);
           }
-          notiProvider.escucharRuta(idActual, puntosGeograficos: zonasFiltradas);
+          notiProvider.escucharRuta(idActual);
         } else {
-          notiProvider.escucharRuta(idActual, puntosGeograficos: zonas);
+          notiProvider.escucharRuta(idActual);
         }
       }
-      
     } else {
-      final List<Map<String, dynamic>> fallback = [{
-        'zona_nombre': 'mi_ubicacion',
-        'latitud': mapaProvider.ubicacionActual.latitude,
-        'longitud': mapaProvider.ubicacionActual.longitude,
-        'radio_km': 15.0,
-      }];
-      notiProvider.desconectarRuta(puntosFallback: fallback);
+      notiProvider.desconectarRuta();
     }
   }
 
@@ -147,7 +159,7 @@ class _MainScreenState extends State<MainScreen> {
         final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
         await flutterLocalNotificationsPlugin
             .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin>()
             ?.requestNotificationsPermission();
       } catch (e) {
         debugPrint('Error solicitando permisos de notificación: $e');
@@ -157,13 +169,15 @@ class _MainScreenState extends State<MainScreen> {
     await mapaProvider.inicializarUbicacion();
     await mapaProvider.cargarClusters();
     await notiProvider.cargarHistorial();
-    
+
     if (mounted) {
       _moverAPunto(mapaProvider.ubicacionActual);
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _inicializarZonaUbicacion();
+      if (mounted) {
+        _inicializarZonaUbicacion();
+      }
     });
   }
 
@@ -176,6 +190,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _inicializarZonaUbicacion() {
+    if (!mounted) return;
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
     if (!mapaProvider.zonaInicializada) {
@@ -184,6 +199,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _moverAPunto(LatLng punto) {
+    if (!mounted) return;
     _mapController.move(punto, 14.5);
   }
 
@@ -191,12 +207,14 @@ class _MainScreenState extends State<MainScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, 
-      builder: (_) => NotificacionesPanel(
+      backgroundColor: Colors.transparent,
+      builder: (_) => NotificacionesPanelV2(
         onNotificacionTap: (lat, lon) {
           final destino = LatLng(lat, lon);
-          setState(() => _puntoEnfocado = destino);
-          _moverAPunto(destino);
+          if (mounted) {
+            setState(() => _puntoEnfocado = destino);
+            _moverAPunto(destino);
+          }
         },
       ),
     );
@@ -206,26 +224,9 @@ class _MainScreenState extends State<MainScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (_) => const BuscadorRutasWidget(),
     );
-  }
-
-  void _enviarReporte(String notaVoz) {
-    final reporteProvider = context.read<ReporteProvider>();
-    final mapaProvider = context.read<MapaProvider>();
-    if (_tipoReporteSeleccionado != null) {
-      final rutaId = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
-      reporteProvider.enviarReporte(
-        tipo: _tipoReporteSeleccionado!,
-        latitud: mapaProvider.ubicacionActual.latitude,
-        longitud: mapaProvider.ubicacionActual.longitude,
-        notaVoz: notaVoz,
-        rutaId: rutaId,
-      );
-    }
   }
 
   @override
@@ -235,58 +236,133 @@ class _MainScreenState extends State<MainScreen> {
     final reporteProvider = context.watch<ReporteProvider>();
     final notiProvider = context.watch<NotificacionProvider>();
 
-    final tieneRutas = mapaProvider.rutas.isNotEmpty || 
-                       mapaProvider.mostrarSoloSeleccionada || 
-                       mapaProvider.cargandoRutas;
+    final tieneRutas = mapaProvider.rutas.isNotEmpty ||
+        mapaProvider.mostrarSoloSeleccionada ||
+        mapaProvider.cargandoRutas;
 
     return Scaffold(
+      backgroundColor: AppColors.slate50,
       appBar: AppBar(
+        backgroundColor: AppColors.white.withOpacity(0.88),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('SafeRoute'),
-            const SizedBox(width: 8),
             Container(
-              width: 8, height: 8,
+              width: 28.r,
+              height: 28.r,
               decoration: BoxDecoration(
-                color: _online ? Colors.green : Colors.red,
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(6.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4.r,
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.all(2.r),
+              child: Image.asset(
+                'assets/saferoute_blue_nof.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Icons.shield,
+                  color: AppColors.primary,
+                  size: 20.r,
+                ),
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              'SafeRoute',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.18,
+                color: AppColors.slate800,
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Container(
+              width: 8.r,
+              height: 8.r,
+              decoration: BoxDecoration(
+                color: _online ? AppColors.success : AppColors.danger,
                 shape: BoxShape.circle,
               ),
             ),
           ],
         ),
         actions: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                onPressed: () => _mostrarNotificaciones(context),
+          // Botón de notificaciones
+          GestureDetector(
+            onTap: () => _mostrarNotificaciones(context),
+            child: Container(
+              width: 36.r,
+              height: 36.r,
+              decoration: BoxDecoration(
+                color: AppColors.white.withOpacity(0.7),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.slate200),
               ),
-              if (notiProvider.sinLeer > 0)
-                Positioned(
-                  right: 8, top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                    child: Text(
-                      '${notiProvider.sinLeer}',
-                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_outlined,
+                    size: 18.r,
+                    color: AppColors.slate700,
                   ),
-                ),
-            ],
+                  if (notiProvider.sinLeer > 0)
+                    Positioned(
+                      top: 4.h,
+                      right: 4.w,
+                      child: Container(
+                        width: 8.r,
+                        height: 8.r,
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.white,
+                            width: 1.5.r,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: () {
-            auth.logout();
-            Navigator.pushReplacementNamed(context, '/');
-          }),
+          SizedBox(width: 8.w),
+          // Botón de logout
+          GestureDetector(
+            onTap: () {
+              auth.logout();
+              Navigator.pushReplacementNamed(context, '/');
+            },
+            child: Container(
+              width: 36.r,
+              height: 36.r,
+              decoration: BoxDecoration(
+                color: AppColors.white.withOpacity(0.7),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.slate200),
+              ),
+              child: Icon(
+                Icons.logout,
+                size: 18.r,
+                color: AppColors.slate700,
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
         ],
       ),
       body: Stack(
         children: [
+          // Mapa
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -296,7 +372,9 @@ class _MainScreenState extends State<MainScreen> {
                 if (_puntoEnfocado != null) setState(() => _puntoEnfocado = null);
               },
               interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+                flags: InteractiveFlag.drag |
+                InteractiveFlag.pinchZoom |
+                InteractiveFlag.doubleTapZoom,
               ),
             ),
             children: [
@@ -309,117 +387,225 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
 
+          // Gradient superior
           Positioned(
-            top: 16, left: 16, right: 16,
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 140.h,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.slate50.withOpacity(0.82),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Gradient inferior
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 140.h,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    AppColors.slate50.withOpacity(0.68),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+
+          // Ruta Pill
+          Positioned(
+            top: 10.h,
+            left: 16.w,
+            right: 16.w,
             child: Column(
               children: [
                 if (!tieneRutas)
-                  ElevatedButton.icon(
-                    onPressed: () => _mostrarBuscadorRutas(context),
-                    icon: const Icon(Icons.route, color: Colors.green),
-                    label: const Text('¿A dónde vas? - Ruta Segura'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      elevation: 6,
-                    ),
-                  )
+                  _buildSearchButton()
                 else
                   const RutaPillWidget(),
               ],
             ),
           ),
 
+          // Panel inferior
           Positioned(
-            bottom: 20, left: 16, right: 16,
+            bottom: 24.h,
+            left: 16.w,
+            right: 16.w,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Mensajes de estado
                 if (reporteProvider.ultimoResultado != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: reporteProvider.ultimoResultado == 'éxito' ? Colors.green : Colors.red,
-                    ),
-                    child: Text(
-                      reporteProvider.ultimoResultado == 'éxito' ? 'Reporte enviado' : '❌ ${reporteProvider.error}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                  _buildStatusMessage(reporteProvider),
                 if (reporteProvider.enviando)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                        SizedBox(width: 12),
-                        Text('Enviando reporte...', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                if (!_mostrandoBarraReportes && _tipoReporteSeleccionado == null)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: FloatingActionButton.extended(
-                      heroTag: 'reportar_btn',
-                      backgroundColor: Colors.orange[800],
-                      onPressed: () => setState(() => _mostrandoBarraReportes = true),
-                      icon: const Icon(Icons.report_problem, color: Colors.white),
-                      label: const Text('REPORTAR INCIDENTE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  )
-                else if (_mostrandoBarraReportes && _tipoReporteSeleccionado == null)
-                  Column(
-                    children: [
-                      BarraReportesWidget(
-                        onTipoSeleccionado: (tipo) => setState(() {
-                          _tipoReporteSeleccionado = tipo;
-                          _mostrandoBarraReportes = false;
-                        }),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => setState(() => _mostrandoBarraReportes = false),
-                        child: const Text('Cancelar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  )
-                else if (_tipoReporteSeleccionado != null)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      IconButton.filled(
-                        onPressed: () => setState(() => _tipoReporteSeleccionado = null),
-                        icon: const Icon(Icons.close, size: 36),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.red[900],
-                          minimumSize: const Size(72, 72),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Flexible(
-                        child: NotaVozWidget(onTextoListo: _enviarReporte),
-                      ),
-                    ],
-                  ),
+                  _buildLoadingIndicator(),
+                // Botón de reporte rediseñado
+                ReportButtonWidget(
+                  onReporteEnviado: (tipo, notaVoz) {
+                    _enviarReporte(tipo, notaVoz);
+                  },
+                  isLoading: reporteProvider.enviando,
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSearchButton() {
+    return GestureDetector(
+      onTap: () => _mostrarBuscadorRutas(context),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+        decoration: BoxDecoration(
+          color: AppColors.white.withOpacity(0.94),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AppColors.slate200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 24.r,
+              offset: Offset(0, 4.h),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.search,
+              color: AppColors.primary,
+              size: 20.r,
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                '¿A dónde vas?',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.slate500,
+                ),
+              ),
+            ),
+            Container(
+              width: 32.r,
+              height: 32.r,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.navigation,
+                color: AppColors.primary,
+                size: 16.r,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusMessage(ReporteProvider reporteProvider) {
+    final isSuccess = reporteProvider.ultimoResultado == 'éxito';
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.r),
+      decoration: BoxDecoration(
+        color: isSuccess ? AppColors.successBg : AppColors.dangerBg,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: isSuccess ? AppColors.success.withOpacity(0.3) : AppColors.danger.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isSuccess ? Icons.check_circle : Icons.error_outline,
+            color: isSuccess ? AppColors.success : AppColors.danger,
+            size: 20.r,
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              isSuccess ? 'Reporte enviado' : reporteProvider.error ?? 'Error',
+              style: TextStyle(
+                color: isSuccess ? AppColors.success : AppColors.danger,
+                fontWeight: FontWeight.w600,
+                fontSize: 13.sp,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.r),
+      decoration: BoxDecoration(
+        color: AppColors.slate800.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 20.r,
+            height: 20.r,
+            child: const CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.white,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Text(
+            'Enviando reporte...',
+            style: TextStyle(
+              color: AppColors.white,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _enviarReporte(String tipo, String notaVoz) {
+    final reporteProvider = context.read<ReporteProvider>();
+    final mapaProvider = context.read<MapaProvider>();
+    final rutaId = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
+    reporteProvider.enviarReporte(
+      tipo: tipo,
+      latitud: mapaProvider.ubicacionActual.latitude,
+      longitud: mapaProvider.ubicacionActual.longitude,
+      notaVoz: notaVoz,
+      rutaId: rutaId,
     );
   }
 
@@ -449,88 +635,140 @@ class _MainScreenState extends State<MainScreen> {
 
   Color _colorRuta(String seguridad) {
     switch (seguridad) {
-      case 'rojo': return Colors.red;
-      case 'naranja': return Colors.orange;
-      default: return Colors.green;
+      case 'rojo':
+        return AppColors.riskHigh;
+      case 'naranja':
+        return AppColors.riskMedium;
+      default:
+        return AppColors.riskLow;
     }
   }
 
   List<Marker> _buildMarkers(MapaProvider mapaProvider, NotificacionProvider notiProvider) {
     final markers = <Marker>[];
-    
-    for (var cluster in mapaProvider.clusters) {
+
+    // Alertas activas en el mapa (vía WS)
+    for (var alerta in notiProvider.alertasMapa) {
+      final color = _getTipoColor(alerta.tipo);
       markers.add(Marker(
-        point: LatLng(
-          (cluster['latitud'] as num).toDouble(), 
-          (cluster['longitud'] as num).toDouble()
-        ),
-        width: 45,
-        height: 45,
+        point: LatLng(alerta.latitud, alerta.longitud),
+        width: 40.r,
+        height: 40.r,
         child: GestureDetector(
-          onTap: () => _mostrarDetalleCluster(cluster),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(Icons.location_on, color: _colorSeguridad(cluster['nivelSeguridad']), size: 45),
-              Positioned(
-                top: 8,
-                child: Text(
-                  '${cluster['cantidad']}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              ),
-            ],
+          onTap: () => _mostrarDetalleAlerta(alerta),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _getTipoIcon(alerta.tipo),
+              color: color,
+              size: 24.r,
+            ),
           ),
         ),
       ));
     }
 
+    // Origen de búsqueda
     if (mapaProvider.origenBusqueda != null) {
       markers.add(Marker(
         point: mapaProvider.origenBusqueda!,
-        width: 40,
-        height: 40,
-        child: const Icon(Icons.location_on, color: Colors.green, size: 35),
+        width: 40.r,
+        height: 40.r,
+        child: Icon(
+          Icons.location_on,
+          color: AppColors.success,
+          size: 35.r,
+        ),
       ));
     }
 
+    // Destino de búsqueda
     if (mapaProvider.destinoBusqueda != null) {
       markers.add(Marker(
         point: mapaProvider.destinoBusqueda!,
-        width: 45,
-        height: 45,
-        child: const Icon(Icons.flag, color: Colors.red, size: 40),
+        width: 45.r,
+        height: 45.r,
+        child: Icon(
+          Icons.flag,
+          color: AppColors.danger,
+          size: 40.r,
+        ),
       ));
     }
 
+    // Ubicación actual
     markers.add(Marker(
       point: mapaProvider.ubicacionActual,
-      width: 40,
-      height: 40,
-      child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
+      width: 40.r,
+      height: 40.r,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 36.r,
+            height: 36.r,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+          ),
+          Container(
+            width: 24.r,
+            height: 24.r,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.white, width: 2.r),
+            ),
+            child: Center(
+              child: Container(
+                width: 8.r,
+                height: 8.r,
+                decoration: const BoxDecoration(
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ));
 
+    // Punto enfocado
     if (_puntoEnfocado != null) {
       markers.add(Marker(
         point: _puntoEnfocado!,
-        width: 100,
-        height: 100,
+        width: 100.r,
+        height: 100.r,
         child: GestureDetector(
           onTap: () => setState(() => _puntoEnfocado = null),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: Colors.red[900],
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                  color: AppColors.danger,
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: const Text('VER AQUÍ', 
-                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'VER AQUÍ',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              const Icon(Icons.location_on, color: Colors.red, size: 50),
+              Icon(
+                Icons.location_on,
+                color: AppColors.danger,
+                size: 50.r,
+              ),
             ],
           ),
         ),
@@ -540,22 +778,138 @@ class _MainScreenState extends State<MainScreen> {
     return markers;
   }
 
-  Color _colorSeguridad(String nivel) {
-    switch (nivel) {
-      case 'ALTO': return Colors.red;
-      case 'MEDIO': return Colors.orange;
-      default: return Colors.green;
+  Color _getTipoColor(String tipo) {
+    switch (tipo.toLowerCase()) {
+      case 'accident': case 'accidente': return AppColors.danger;
+      case 'flood': case 'inundacion': return AppColors.primary;
+      case 'pothole': case 'bache': return AppColors.warning;
+      case 'blockage': case 'bloqueo': return AppColors.purple;
+      case 'landslide': case 'derrumbe': return const Color(0xFFEA580C);
+      case 'fog': case 'niebla': return const Color(0xFF0EA5E9);
+      case 'nolight': case 'sin_luz': return const Color(0xFFEAB308);
+      default: return AppColors.slate500;
     }
   }
 
-  void _mostrarDetalleCluster(Map<String, dynamic> cluster) {
+  IconData _getTipoIcon(String tipo) {
+    switch (tipo.toLowerCase()) {
+      case 'accident': case 'accidente': return Icons.car_crash;
+      case 'flood': case 'inundacion': return Icons.water_drop;
+      case 'pothole': case 'bache': return Icons.circle;
+      case 'blockage': case 'bloqueo': return Icons.block;
+      case 'landslide': case 'derrumbe': return Icons.landslide;
+      case 'fog': case 'niebla': return Icons.foggy;
+      case 'nolight': case 'sin_luz': return Icons.lightbulb_outline;
+      default: return Icons.notification_important;
+    }
+  }
+
+  void _mostrarDetalleAlerta(Notificacion alerta) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Zona: ${cluster['nivelSeguridad']} RIESGO'),
-        content: Text('Se han reportado ${cluster['cantidad']} incidentes en esta área recientemente.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendido'))],
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(20.r),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(20.r),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40.r,
+                    height: 40.r,
+                    decoration: BoxDecoration(
+                      color: _getTipoColor(alerta.tipo).withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getTipoIcon(alerta.tipo),
+                      color: _getTipoColor(alerta.tipo),
+                      size: 20.r,
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Text(
+                      alerta.tipo.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.slate800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.r),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      alerta.mensaje,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.slate700,
+                      ),
+                    ),
+                    if (alerta.notaVoz.isNotEmpty) ...[
+                      SizedBox(height: 8.h),
+                      Text(
+                        alerta.notaVoz,
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: AppColors.slate500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(height: 16.h),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Entendido',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  // Mantener por compatibilidad si es necesario, pero _mostrarDetalleAlerta es la principal ahora
+  void _mostrarDetalleCluster(Map<String, dynamic> cluster) {}
 }

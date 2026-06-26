@@ -1,3 +1,4 @@
+// lib/domain/repositories/reporte_repository.dart
 import '../entities/reporte.dart';
 
 abstract class IReporteRepository {
@@ -9,7 +10,9 @@ abstract class IReporteRepository {
     required String rutaId,
     required String token,
   });
+
   Future<List<Reporte>> obtenerReportes({required String token});
+
   Future<void> validarReporte({
     required String reporteId,
     required bool vigente,
