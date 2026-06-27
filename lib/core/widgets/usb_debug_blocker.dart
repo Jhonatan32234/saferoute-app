@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../core/security/usb_debug_checker.dart';
+import '../security/usb_debug_checker.dart';
 
 class UsbDebugBlocker extends StatefulWidget {
   final Widget child;

@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/app_button.dart';
-import '../widgets/app_text_field.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_text_field.dart';
 import 'main_screen.dart';
 
 class LoginPage extends StatefulWidget {
@@ -209,7 +209,7 @@ class _LoginPageState extends State<LoginPage> {
                                   color: AppColors.slate400,
                                 ),
                               ),
-                              SizedBox(height: 20.h),
+                              SizedBox(height: 24.h),
 
                               // Email
                               AppTextField(
@@ -252,6 +252,8 @@ class _LoginPageState extends State<LoginPage> {
                                 },
                               ),
 
+                              SizedBox(height: 16.h),
+
                               // Recordar datos
                               Row(
                                 children: [
@@ -279,7 +281,8 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 16.h),
+
+                              SizedBox(height: 24.h),
 
                               // Error
                               if (auth.error != null)

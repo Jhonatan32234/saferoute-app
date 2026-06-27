@@ -1,7 +1,7 @@
 // lib/presentation/widgets/app_text_field.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../core/theme/app_colors.dart';
+import '../theme/app_colors.dart';
 
 class AppTextField extends StatelessWidget {
   final TextEditingController controller;
