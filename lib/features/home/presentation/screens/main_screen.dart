@@ -1,4 +1,3 @@
-// lib/presentation/pages/main_screen.dart
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -8,16 +7,18 @@ import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../core/theme/app_colors.dart';
-import '../../domain/entities/notificacion.dart';
-import '../providers/auth_provider.dart';
-import '../providers/mapa_provider.dart';
-import '../providers/reporte_provider.dart';
-import '../providers/notificacion_provider.dart';
-import '../widgets/ruta_pill_widget.dart';
-import '../widgets/buscador_rutas_widget.dart';
-import '../widgets/report_button_widget.dart';
-import '../widgets/notificaciones_panel_v2.dart';
+
+// Imports Absolutos
+import 'package:saferoute_app/core/theme/app_colors.dart';
+import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion.dart';
+import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
+import 'package:saferoute_app/features/reportes/presentation/providers/reporte_provider.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/rutas/presentation/widgets/ruta_pill_widget.dart';
+import 'package:saferoute_app/features/rutas/presentation/widgets/buscador_rutas_widget.dart';
+import 'package:saferoute_app/features/reportes/presentation/widgets/report_button_widget.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
+import 'package:saferoute_app/features/login/presentation/providers/auth_provider.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -79,7 +80,8 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
 
-    final String idActual = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
+    // CAMBIO: Acceso a propiedad de entidad (.id)
+    final String idActual = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
 
     if (idActual == _ultimaRutaIdEscuchada) return;
     _ultimaRutaIdEscuchada = idActual;
@@ -102,7 +104,8 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() => _puntoEnfocado = null);
 
-      final String nombreRuta = mapaProvider.rutaSeleccionada!['nombre'] ?? 'Ruta';
+      // CAMBIO: Acceso a propiedad (.nombre)
+      final String nombreRuta = mapaProvider.rutaSeleccionada!.nombre;
 
       final index = mapaProvider.rutas.indexOf(mapaProvider.rutaSeleccionada!);
       if (index >= 0 && index < mapaProvider.polilineas.length) {
@@ -295,7 +298,6 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
-          // Botón de notificaciones
           GestureDetector(
             onTap: () => _mostrarNotificaciones(context),
             child: Container(
@@ -336,7 +338,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           SizedBox(width: 8.w),
-          // Botón de logout
           GestureDetector(
             onTap: () {
               auth.logout();
@@ -362,7 +363,6 @@ class _MainScreenState extends State<MainScreen> {
       ),
       body: Stack(
         children: [
-          // Mapa
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -386,8 +386,6 @@ class _MainScreenState extends State<MainScreen> {
               MarkerLayer(markers: _buildMarkers(mapaProvider, notiProvider)),
             ],
           ),
-
-          // Gradient superior
           Positioned(
             top: 0,
             left: 0,
@@ -406,8 +404,6 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-
-          // Gradient inferior
           Positioned(
             bottom: 0,
             left: 0,
@@ -426,9 +422,6 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-
-
-          // Ruta Pill
           Positioned(
             top: 10.h,
             left: 16.w,
@@ -442,8 +435,6 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
           ),
-
-          // Panel inferior
           Positioned(
             bottom: 24.h,
             left: 16.w,
@@ -452,12 +443,10 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Mensajes de estado
                 if (reporteProvider.ultimoResultado != null)
                   _buildStatusMessage(reporteProvider),
                 if (reporteProvider.enviando)
                   _buildLoadingIndicator(),
-                // Botón de reporte rediseñado
                 ReportButtonWidget(
                   onReporteEnviado: (tipo, notaVoz) {
                     _enviarReporte(tipo, notaVoz);
@@ -599,7 +588,8 @@ class _MainScreenState extends State<MainScreen> {
   void _enviarReporte(String tipo, String notaVoz) {
     final reporteProvider = context.read<ReporteProvider>();
     final mapaProvider = context.read<MapaProvider>();
-    final rutaId = mapaProvider.rutaSeleccionada?['id']?.toString() ?? 'sin-ruta';
+    // CAMBIO: Acceso a propiedad de entidad (.id)
+    final rutaId = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
     reporteProvider.enviarReporte(
       tipo: tipo,
       latitud: mapaProvider.ubicacionActual.latitude,
@@ -617,7 +607,8 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[index],
           strokeWidth: 5,
-          color: _colorRuta(mapaProvider.rutaSeleccionada!['seguridad'] ?? 'verde'),
+          // CAMBIO: Acceso a propiedad (.seguridad)
+          color: _colorRuta(mapaProvider.rutaSeleccionada!.seguridad),
         ));
       }
     } else {
@@ -626,7 +617,8 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[i],
           strokeWidth: 4,
-          color: _colorRuta(r['seguridad'] ?? 'verde').withOpacity(0.8),
+          // CAMBIO: Acceso a propiedad (.seguridad)
+          color: _colorRuta(r.seguridad).withOpacity(0.8),
         ));
       }
     }
@@ -647,7 +639,6 @@ class _MainScreenState extends State<MainScreen> {
   List<Marker> _buildMarkers(MapaProvider mapaProvider, NotificacionProvider notiProvider) {
     final markers = <Marker>[];
 
-    // Alertas activas en el mapa (vía WS)
     for (var alerta in notiProvider.alertasMapa) {
       final color = _getTipoColor(alerta.tipo);
       markers.add(Marker(
@@ -671,7 +662,6 @@ class _MainScreenState extends State<MainScreen> {
       ));
     }
 
-    // Origen de búsqueda
     if (mapaProvider.origenBusqueda != null) {
       markers.add(Marker(
         point: mapaProvider.origenBusqueda!,
@@ -685,7 +675,6 @@ class _MainScreenState extends State<MainScreen> {
       ));
     }
 
-    // Destino de búsqueda
     if (mapaProvider.destinoBusqueda != null) {
       markers.add(Marker(
         point: mapaProvider.destinoBusqueda!,
@@ -699,7 +688,6 @@ class _MainScreenState extends State<MainScreen> {
       ));
     }
 
-    // Ubicación actual
     markers.add(Marker(
       point: mapaProvider.ubicacionActual,
       width: 40.r,
@@ -738,7 +726,6 @@ class _MainScreenState extends State<MainScreen> {
       ),
     ));
 
-    // Punto enfocado
     if (_puntoEnfocado != null) {
       markers.add(Marker(
         point: _puntoEnfocado!,
@@ -910,6 +897,5 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Mantener por compatibilidad si es necesario, pero _mostrarDetalleAlerta es la principal ahora
   void _mostrarDetalleCluster(Map<String, dynamic> cluster) {}
 }

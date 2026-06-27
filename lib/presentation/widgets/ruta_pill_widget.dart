@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../providers/mapa_provider.dart';
+
+// Imports absolutos
+import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
+// Asumiendo que ruta_card.dart está en la misma carpeta
 import 'ruta_card.dart';
 
 class RutaPillWidget extends StatelessWidget {
@@ -36,7 +39,8 @@ class RutaPillWidget extends StatelessWidget {
             Container(
               width: 4.w, height: 32.h,
               decoration: BoxDecoration(
-                color: _colorSeguridad(ruta['seguridad'] ?? 'verde'),
+                // CAMBIO: ruta.seguridad
+                color: _colorSeguridad(ruta.seguridad),
                 borderRadius: BorderRadius.circular(2.r),
               ),
             ),
@@ -46,9 +50,11 @@ class RutaPillWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(ruta['nombre'] ?? 'Ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                  // CAMBIO: ruta.nombre
+                  Text(ruta.nombre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                  // CAMBIO: ruta.distanciaKm y ruta.tiempoMinutos
                   Text(
-                    '${(ruta['distancia_km'] ?? 0).toStringAsFixed(1)} km · ${ruta['tiempo_minutos'] ?? 0} min',
+                    '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min',
                     style: TextStyle(color: Colors.grey[600], fontSize: 11.sp),
                   ),
                 ],
@@ -93,12 +99,13 @@ class RutaPillWidget extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final ruta = mapaProvider.rutas[index];
                   return RutaCard(
-                    nombre: ruta['nombre'] ?? 'Ruta',
-                    tipo: ruta['tipo'] ?? 'estandar',
-                    seguridad: ruta['seguridad'] ?? 'verde',
-                    distanciaKm: (ruta['distancia_km'] ?? 0).toDouble(),
-                    tiempoMinutos: (ruta['tiempo_minutos'] ?? 0).toInt(),
-                    riesgoCombinado: (ruta['riesgo_combinado'] ?? 0).toDouble(),
+                    // CAMBIO: Todas las propiedades usan sintaxis de punto
+                    nombre: ruta.nombre,
+                    tipo: ruta.tipo,
+                    seguridad: ruta.seguridad,
+                    distanciaKm: ruta.distanciaKm,
+                    tiempoMinutos: ruta.tiempoMinutos,
+                    riesgoCombinado: ruta.riesgoCombinado,
                     onSelect: () => mapaProvider.seleccionarRuta(index),
                   );
                 },

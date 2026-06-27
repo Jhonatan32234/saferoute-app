@@ -3,16 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:injectable/injectable.dart';
-import '../../data/datasources/api_datasources.dart';
-import 'notificacion_provider.dart';
+
+// Imports absolutos a tu propia feature
+import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
+import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {
-  final ApiDataSource api;
+  // Ahora usamos el repositorio específico del Home
+  final IHomeRepository homeRepository;
   String _token = '';
   bool _zonaInicializada = false;
 
-  MapaProvider(this.api);
+  MapaProvider(this.homeRepository);
 
   set token(String nuevoToken) {
     _token = nuevoToken;
@@ -21,11 +25,13 @@ class MapaProvider extends ChangeNotifier {
   String get token => _token;
 
   LatLng _ubicacionActual = const LatLng(16.753, -93.115);
-  List<Map<String, dynamic>> _rutas = [];
+
+  // ¡CAMBIO CLAVE! Ahora es una lista de entidades, no de mapas crudos
+  List<RutaEntity> _rutas = [];
   bool _cargandoRutas = false;
   String? _error;
 
-  Map<String, dynamic>? _rutaSeleccionada;
+  RutaEntity? _rutaSeleccionada;
   List<List<LatLng>> _polilineas = [];
   bool _mostrarSoloSeleccionada = false;
 
@@ -36,15 +42,15 @@ class MapaProvider extends ChangeNotifier {
   String _textoDestino = '';
   bool _usarUbicacionActualPersistente = true;
 
-  // Stream para seguimiento en tiempo real
   StreamSubscription<Position>? _posicionStream;
   bool _rastreoActivo = false;
 
+  // Getters actualizados
   LatLng get ubicacionActual => _ubicacionActual;
-  List<Map<String, dynamic>> get rutas => _rutas;
+  List<RutaEntity> get rutas => _rutas;
   bool get cargandoRutas => _cargandoRutas;
   String? get error => _error;
-  Map<String, dynamic>? get rutaSeleccionada => _rutaSeleccionada;
+  RutaEntity? get rutaSeleccionada => _rutaSeleccionada;
   List<List<LatLng>> get polilineas => _polilineas;
   bool get mostrarSoloSeleccionada => _mostrarSoloSeleccionada;
   LatLng? get origenBusqueda => _origenBusqueda;
@@ -53,7 +59,6 @@ class MapaProvider extends ChangeNotifier {
   String get textoOrigen => _textoOrigen;
   String get textoDestino => _textoDestino;
   bool get usarUbicacionActualPersistente => _usarUbicacionActualPersistente;
-
   bool get zonaInicializada => _zonaInicializada;
   bool get rastreoActivo => _rastreoActivo;
 
@@ -79,7 +84,6 @@ class MapaProvider extends ChangeNotifier {
       _ubicacionActual = LatLng(pos.latitude, pos.longitude);
       notifyListeners();
 
-      // Iniciar rastreo continuo
       _iniciarRastreoGPS();
     } catch (e) {
       debugPrint("GPS error: $e");
@@ -89,14 +93,14 @@ class MapaProvider extends ChangeNotifier {
   void _iniciarRastreoGPS() {
     _rastreoActivo = true;
     _posicionStream?.cancel();
-    
+
     _posicionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Actualizar cada 10 metros
+        distanceFilter: 10,
       ),
     ).listen(
-      (Position posicion) {
+          (Position posicion) {
         if (!_rastreoActivo) return;
         _ubicacionActual = LatLng(posicion.latitude, posicion.longitude);
         notifyListeners();
@@ -115,12 +119,8 @@ class MapaProvider extends ChangeNotifier {
 
   void actualizarZonaUbicacion(NotificacionProvider notiProvider) {
     if (_zonaInicializada) return;
-    // Ya no enviamos zonas de cobertura estáticas, 
-    // ahora dependemos de la telemetría enviada por WebSocket.
     _zonaInicializada = true;
   }
-
-  // Método obsoleto eliminado: cargarClusters
 
   Future<void> buscarRutas({
     required double origenLat,
@@ -138,20 +138,22 @@ class MapaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final rutasRaw = await api.getRutas(
+      // Llamada al repositorio puro que devuelve List<RutaEntity>
+      _rutas = await homeRepository.getRutas(
         origenLat: origenLat,
         origenLon: origenLon,
         destinoLat: destinoLat,
         destinoLon: destinoLon,
         token: _token,
       );
-      _rutas = List<Map<String, dynamic>>.from(rutasRaw);
 
       _polilineas = [];
       for (final ruta in _rutas) {
-        final geometria = ruta['geometria_osrm'] as List<dynamic>?;
-        if (geometria != null) {
-          _polilineas.add(geometria.map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble())).toList());
+        // Accedemos a la propiedad .coordenadas del objeto
+        if (ruta.coordenadas.isNotEmpty) {
+          _polilineas.add(ruta.coordenadas
+              .map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble()))
+              .toList());
         }
       }
     } catch (e) {
@@ -195,10 +197,7 @@ class MapaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> cargarClusters() async {
-    // Método mantenido como vacío para no romper llamadas externas si existen,
-    // pero la lógica de dibujo ya fue eliminada de la UI.
-  }
+  Future<void> cargarClusters() async {}
 
   @override
   void dispose() {
