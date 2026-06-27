@@ -7,7 +7,8 @@ import 'package:injectable/injectable.dart';
 // Imports absolutos a tu propia feature
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
-import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+
+import '../../../notifications/presentation/providers/notificacion_provider.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {

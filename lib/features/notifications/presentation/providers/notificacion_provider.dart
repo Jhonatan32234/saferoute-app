@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:injectable/injectable.dart';
-import '../../domain/entities/notificacion.dart';
-import '../../data/datasources/api_datasources.dart';
+import '../../../../domain/entities/notificacion.dart';
+import '../../../../data/datasources/api_datasources.dart';
 
 @injectable
 class NotificacionProvider extends ChangeNotifier {

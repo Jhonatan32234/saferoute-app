@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/reporte_mapper.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/reporte_mapper.dart';
 
 class ReportButtonWidget extends StatefulWidget {
   final Function(String tipo, String notaVoz) onReporteEnviado;

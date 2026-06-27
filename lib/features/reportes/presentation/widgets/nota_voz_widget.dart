@@ -6,7 +6,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class NotaVozWidget extends StatefulWidget {
   final Function(String textoTranscrito) onTextoListo;

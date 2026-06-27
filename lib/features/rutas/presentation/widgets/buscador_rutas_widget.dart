@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../core/theme/app_colors.dart';  // ✅ Solo importar de aquí
-import '../../core/constants.dart';
-import '../../features/home/presentation/providers/mapa_provider.dart';
+import '../../../../core/theme/app_colors.dart';  // ✅ Solo importar de aquí
+import '../../../../core/constants.dart';
+import '../../../home/presentation/providers/mapa_provider.dart';
 
 class BuscadorRutasWidget extends StatefulWidget {
   const BuscadorRutasWidget({super.key});

@@ -45,9 +45,6 @@ class ReporteProvider extends ChangeNotifier {
     });
   }
 
-  // lib/presentation/providers/reporte_provider.dart
-// En el método enviarReporte, eliminar la línea que reemplaza el texto
-
   Future<void> enviarReporte({
     required String tipo,
     required double latitud,
@@ -63,15 +60,11 @@ class ReporteProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ✅ ELIMINAR esta línea que reemplaza el texto:
-      // notaVoz: notaVoz.trim().isEmpty ? tipo : notaVoz.trim(),
-
-      // ✅ Usar el texto directamente
       await _repository.crearReporte(
         tipo: tipo,
         latitud: latitud,
         longitud: longitud,
-        notaVoz: notaVoz.trim(),  // ✅ Solo trim, sin reemplazo
+        notaVoz: notaVoz.trim(),
         rutaId: rutaId,
         token: _token,
       );
@@ -108,7 +101,7 @@ class ReporteProvider extends ChangeNotifier {
     try {
       final data = await _storage.read(key: 'reportes_pendientes');
       List<dynamic> pendientes = data != null ? jsonDecode(data) : [];
-      
+
       pendientes.add({
         'tipo': tipo,
         'latitud': latitud,
@@ -117,7 +110,7 @@ class ReporteProvider extends ChangeNotifier {
         'ruta_id': rutaId,
         'timestamp': DateTime.now().toIso8601String(),
       });
-      
+
       await _storage.write(key: 'reportes_pendientes', value: jsonEncode(pendientes));
     } catch (e) {
       debugPrint("Error en cache local: $e");

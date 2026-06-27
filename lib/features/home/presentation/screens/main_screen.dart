@@ -8,17 +8,18 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-// Imports Absolutos
+// Imports absolutos para evitar errores de URI
 import 'package:saferoute_app/core/theme/app_colors.dart';
-import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion.dart';
-import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
 import 'package:saferoute_app/features/reportes/presentation/providers/reporte_provider.dart';
-import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
-import 'package:saferoute_app/features/rutas/presentation/widgets/ruta_pill_widget.dart';
-import 'package:saferoute_app/features/rutas/presentation/widgets/buscador_rutas_widget.dart';
 import 'package:saferoute_app/features/reportes/presentation/widgets/report_button_widget.dart';
-import 'package:saferoute_app/features/notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
+import 'package:saferoute_app/features/rutas/presentation/widgets/buscador_rutas_widget.dart';
+import 'package:saferoute_app/features/rutas/presentation/widgets/ruta_pill_widget.dart';
 import 'package:saferoute_app/features/login/presentation/providers/auth_provider.dart';
+import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
+
+import '../../../../domain/entities/notificacion.dart';
+import '../../../notifications/presentation/providers/notificacion_provider.dart';
+import '../../../notifications/presentation/widgets/notificaciones_panel_v2.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -80,7 +81,7 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
 
-    // CAMBIO: Acceso a propiedad de entidad (.id)
+    // SOLUCIÓN: Usar sintaxis de punto para acceder al ID de la entidad
     final String idActual = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
 
     if (idActual == _ultimaRutaIdEscuchada) return;
@@ -104,7 +105,7 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() => _puntoEnfocado = null);
 
-      // CAMBIO: Acceso a propiedad (.nombre)
+      // SOLUCIÓN: Usar sintaxis de punto para el nombre
       final String nombreRuta = mapaProvider.rutaSeleccionada!.nombre;
 
       final index = mapaProvider.rutas.indexOf(mapaProvider.rutaSeleccionada!);
@@ -588,8 +589,10 @@ class _MainScreenState extends State<MainScreen> {
   void _enviarReporte(String tipo, String notaVoz) {
     final reporteProvider = context.read<ReporteProvider>();
     final mapaProvider = context.read<MapaProvider>();
-    // CAMBIO: Acceso a propiedad de entidad (.id)
+
+    // SOLUCIÓN: Usar sintaxis de punto
     final rutaId = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
+
     reporteProvider.enviarReporte(
       tipo: tipo,
       latitud: mapaProvider.ubicacionActual.latitude,
@@ -607,7 +610,7 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[index],
           strokeWidth: 5,
-          // CAMBIO: Acceso a propiedad (.seguridad)
+          // SOLUCIÓN: Usar sintaxis de punto
           color: _colorRuta(mapaProvider.rutaSeleccionada!.seguridad),
         ));
       }
@@ -617,7 +620,7 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[i],
           strokeWidth: 4,
-          // CAMBIO: Acceso a propiedad (.seguridad)
+          // SOLUCIÓN: Usar sintaxis de punto
           color: _colorRuta(r.seguridad).withOpacity(0.8),
         ));
       }
