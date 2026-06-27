@@ -17,9 +17,9 @@ import 'package:saferoute_app/features/rutas/presentation/widgets/ruta_pill_widg
 import 'package:saferoute_app/features/login/presentation/providers/auth_provider.dart';
 import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
 
-import '../../../../domain/entities/notificacion.dart';
-import '../../../notifications/presentation/providers/notificacion_provider.dart';
-import '../../../notifications/presentation/widgets/notificaciones_panel_v2.dart';
+import 'package:saferoute_app/domain/entities/notificacion.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -34,54 +34,69 @@ class _MainScreenState extends State<MainScreen> {
   LatLng? _puntoEnfocado;
   String? _ultimaRutaIdEscuchada;
   Timer? _telemetriaTimer;
+  late ReporteProvider _reporteProvider;
+  late MapaProvider _mapaProvider;
+  late NotificacionProvider _notiProvider;
+  bool _providersInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _inicializar();
     _monitorearConectividad();
   }
 
   @override
   void dispose() {
     _telemetriaTimer?.cancel();
+    if (_providersInitialized) {
+      _reporteProvider.removeListener(_onReporteCompletado);
+      _mapaProvider.removeListener(_onRutaChanged);
+      _notiProvider.removeListener(_onNotificacionActualizada);
+    }
     super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    context.read<ReporteProvider>().removeListener(_onReporteCompletado);
-    context.read<ReporteProvider>().addListener(_onReporteCompletado);
+    final newReporte = context.read<ReporteProvider>();
+    final newMapa = context.read<MapaProvider>();
+    final newNoti = context.read<NotificacionProvider>();
 
-    context.read<MapaProvider>().removeListener(_onRutaChanged);
-    context.read<MapaProvider>().addListener(_onRutaChanged);
+    if (_providersInitialized) {
+      _reporteProvider.removeListener(_onReporteCompletado);
+      _mapaProvider.removeListener(_onRutaChanged);
+      _notiProvider.removeListener(_onNotificacionActualizada);
+    }
 
-    context.read<NotificacionProvider>().removeListener(_onNotificacionActualizada);
-    context.read<NotificacionProvider>().addListener(_onNotificacionActualizada);
+    _reporteProvider = newReporte;
+    _mapaProvider = newMapa;
+    _notiProvider = newNoti;
+
+    _reporteProvider.addListener(_onReporteCompletado);
+    _mapaProvider.addListener(_onRutaChanged);
+    _notiProvider.addListener(_onNotificacionActualizada);
+
+    if (!_providersInitialized) {
+      _providersInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _inicializar());
+    }
   }
 
   void _onReporteCompletado() {
-    if (mounted) {
-      final reporteProvider = context.read<ReporteProvider>();
-      final mapaProvider = context.read<MapaProvider>();
-      final notiProvider = context.read<NotificacionProvider>();
-
-      if (reporteProvider.ultimoResultado != null) {
-        if (reporteProvider.ultimoResultado == 'éxito') {
-          mapaProvider.cargarClusters();
-          notiProvider.cargarHistorial();
-        }
-      }
+    if (!mounted) return;
+    if (_reporteProvider.ultimoResultado != null &&
+        _reporteProvider.ultimoResultado == 'éxito') {
+      _mapaProvider.cargarClusters();
+      _notiProvider.cargarHistorial();
     }
   }
 
   void _onRutaChanged() {
     if (!mounted) return;
-    final mapaProvider = context.read<MapaProvider>();
-    final notiProvider = context.read<NotificacionProvider>();
+    final mapaProvider = _mapaProvider;
+    final notiProvider = _notiProvider;
 
-    // SOLUCIÓN: Usar sintaxis de punto para acceder al ID de la entidad
     final String idActual = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
 
     if (idActual == _ultimaRutaIdEscuchada) return;
@@ -155,8 +170,8 @@ class _MainScreenState extends State<MainScreen> {
   void _onNotificacionActualizada() {}
 
   Future<void> _inicializar() async {
-    final mapaProvider = context.read<MapaProvider>();
-    final notiProvider = context.read<NotificacionProvider>();
+    final mapaProvider = _mapaProvider;
+    final notiProvider = _notiProvider;
 
     if (Platform.isAndroid) {
       try {
@@ -195,8 +210,8 @@ class _MainScreenState extends State<MainScreen> {
 
   void _inicializarZonaUbicacion() {
     if (!mounted) return;
-    final mapaProvider = context.read<MapaProvider>();
-    final notiProvider = context.read<NotificacionProvider>();
+    final mapaProvider = _mapaProvider;
+    final notiProvider = _notiProvider;
     if (!mapaProvider.zonaInicializada) {
       mapaProvider.actualizarZonaUbicacion(notiProvider);
     }

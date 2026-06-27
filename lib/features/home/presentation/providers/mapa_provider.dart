@@ -8,7 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
 
-import '../../../notifications/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {

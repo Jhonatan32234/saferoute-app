@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'core/di/injection.dart';
-import 'core/theme/app_theme.dart';
-import 'features/login/presentation/providers/auth_provider.dart';
-import 'features/home/presentation/providers/mapa_provider.dart';
-import 'features/reportes/presentation/providers/reporte_provider.dart';
-import 'features/notifications/presentation/providers/notificacion_provider.dart';
-import 'features/login/presentation/screens/login_screen.dart';
-import 'features/home/presentation/screens/main_screen.dart';
-import 'core/widgets/usb_debug_blocker.dart';
-import 'core/widgets/fake_gps_blocker.dart';
+import 'package:saferoute_app/core/di/injection.dart';
+import 'package:saferoute_app/core/theme/app_theme.dart';
+import 'package:saferoute_app/features/login/presentation/providers/auth_provider.dart';
+import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
+import 'package:saferoute_app/features/reportes/presentation/providers/reporte_provider.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/login/presentation/screens/login_screen.dart';
+import 'package:saferoute_app/features/home/presentation/screens/main_screen.dart';
+import 'package:saferoute_app/core/widgets/usb_debug_blocker.dart';
+import 'package:saferoute_app/core/widgets/fake_gps_blocker.dart';
 
 // ✅ Flag para controlar el bloqueo USB
 // Cambiar a false para desactivar temporalmente

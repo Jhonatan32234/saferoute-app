@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:injectable/injectable.dart';
-import '../../../../domain/entities/notificacion.dart';
-import '../../../../data/datasources/api_datasources.dart';
+import 'package:saferoute_app/domain/entities/notificacion.dart';
+import 'package:saferoute_app/features/notificaciones/data/datasources/notification_remote_datasource.dart';
 
 @injectable
 class NotificacionProvider extends ChangeNotifier {
-  final ApiDataSource api;
+  final NotificacionRemoteDataSource api;
   String _token = '';
 
   List<Notificacion> _notificaciones = [];

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'notificacion_provider.dart';
-import '../../../../domain/entities/notificacion.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/domain/entities/notificacion.dart';
 
 class NotificacionesPanel extends StatelessWidget {
   final Function(double lat, double lon)? onNotificacionTap;
