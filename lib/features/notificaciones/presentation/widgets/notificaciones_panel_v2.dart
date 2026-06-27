@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:saferoute_app/core/theme/app_colors.dart';
+import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion_entity.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
-import 'package:saferoute_app/domain/entities/notificacion.dart';
 
 class NotificacionesPanelV2 extends StatelessWidget {
   final Function(double lat, double lon)? onNotificacionTap;
@@ -142,7 +142,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
 
   Widget _buildNotificationItem(
       BuildContext context,
-      Notificacion n,
+      NotificacionEntity n,
       NotificacionProvider provider,
       ) {
     final color = _getTipoColor(n.tipo);
@@ -307,7 +307,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
     }
   }
 
-  void _mostrarDetalles(BuildContext context, Notificacion n) {
+  void _mostrarDetalles(BuildContext context, NotificacionEntity n) {
     showDialog(
       context: context,
       builder: (context) => Dialog(

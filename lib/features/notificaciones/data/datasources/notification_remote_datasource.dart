@@ -25,4 +25,33 @@ class NotificacionRemoteDataSource {
     }
     throw Exception('Error cargando historial');
   }
+
+  Future<void> marcarLeida(String token, String id) async {
+    final response = await client.put(
+      Uri.parse('$baseUrl/api/user/notificaciones/marcar?id=$id'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'leida': true}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Error marcando notificación como leída');
+    }
+  }
+
+  Future<void> marcarTodasLeidas(String token) async {
+    final response = await client.put(
+      Uri.parse('$baseUrl/api/user/notificaciones/marcar-todas'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Error marcando todas las notificaciones como leídas');
+    }
+  }
 }

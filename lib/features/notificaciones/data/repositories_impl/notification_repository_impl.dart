@@ -10,6 +10,20 @@ class NotificacionRepositoryImpl implements INotificacionRepository {
 
   @override
   Future<List<NotificacionEntity>> getHistorial(String token) async {
-    return await _api.getHistorial(token);
+    final historial = await _api.getHistorial(token);
+    return historial.map((item) => item.toEntity()).toList();
   }
+
+  @override
+  Future<void> marcarLeida(String token, String id) async {
+    await _api.marcarLeida(token, id);
+  }
+
+  @override
+  Future<void> marcarTodasLeidas(String token) async {
+    await _api.marcarTodasLeidas(token);
+  }
+
+  @override
+  String get baseUrl => _api.baseUrl;
 }

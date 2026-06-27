@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:injectable/injectable.dart';
-import 'package:saferoute_app/domain/entities/notificacion.dart';
-import 'package:saferoute_app/features/notificaciones/data/datasources/notification_remote_datasource.dart';
+import '../../domain/entities/notificacion_entity.dart';
+import '../../domain/repositories/notification_repository.dart';
 
 @injectable
 class NotificacionProvider extends ChangeNotifier {
-  final NotificacionRemoteDataSource api;
+  final INotificacionRepository repository;
   String _token = '';
 
-  List<Notificacion> _notificaciones = [];
-  List<Notificacion> _alertasMapa = []; // Alertas de proximidad activas
+  List<NotificacionEntity> _notificaciones = [];
+  List<NotificacionEntity> _alertasMapa = []; // Alertas de proximidad activas
   WebSocketChannel? _channel;
   bool _conectado = false;
   String? _currentRutaId;
@@ -21,7 +21,7 @@ class NotificacionProvider extends ChangeNotifier {
   Timer? _reconnectTimer;
   Timer? _historialRefreshTimer; // NUEVO: Timer para refrescar historial
 
-  NotificacionProvider(this.api);
+  NotificacionProvider(this.repository);
 
   set token(String nuevoToken) {
     if (_token != nuevoToken) {
@@ -33,10 +33,11 @@ class NotificacionProvider extends ChangeNotifier {
       }
     }
   }
+
   String get token => _token;
 
-  List<Notificacion> get notificaciones => _notificaciones;
-  List<Notificacion> get alertasMapa => _alertasMapa;
+  List<NotificacionEntity> get notificaciones => _notificaciones;
+  List<NotificacionEntity> get alertasMapa => _alertasMapa;
   int get sinLeer => _notificaciones.where((n) => !n.leida).length;
   bool get conectado => _conectado;
 
@@ -69,20 +70,8 @@ class NotificacionProvider extends ChangeNotifier {
   Future<void> cargarHistorial() async {
     if (_token.isEmpty) return;
     try {
-      final response = await api.client.get(
-        Uri.parse('${api.baseUrl}/api/user/notificaciones?limite=50'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List list = data['notificaciones'] ?? [];
-        _notificaciones = list.map((json) => _mapJsonToNotificacion(json)).toList();
-        notifyListeners();
-      }
+      _notificaciones = await repository.getHistorial(_token);
+      notifyListeners();
     } catch (e) {
       debugPrint("❌ Error cargando historial: $e");
     }
@@ -94,14 +83,7 @@ class NotificacionProvider extends ChangeNotifier {
       _notificaciones[index].leida = true;
       notifyListeners();
       try {
-        await api.client.put(
-          Uri.parse('${api.baseUrl}/api/user/notificaciones/marcar?id=$id'),
-          headers: {
-            'Authorization': 'Bearer $_token',
-            'Content-Type': 'application/json'
-          },
-          body: jsonEncode({'leida': true}),
-        );
+        await repository.marcarLeida(_token, id);
       } catch (e) {
         debugPrint('❌ Error marcando como leída: $e');
       }
@@ -116,32 +98,15 @@ class NotificacionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await api.client.put(
-        Uri.parse('${api.baseUrl}/api/user/notificaciones/marcar-todas'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-          'Content-Type': 'application/json'
-        },
-      );
+      await repository.marcarTodasLeidas(_token);
     } catch (e) {
       debugPrint('❌ Error marcando todas como leídas: $e');
       cargarHistorial();
     }
   }
 
-  Notificacion _mapJsonToNotificacion(Map<String, dynamic> json) {
-    return Notificacion(
-      id: (json['id'] ?? json['reporte_id'] ?? '').toString(),
-      tipo: json['tipo_incidente'] ?? json['tipo'] ?? 'nuevo_reporte',
-      mensaje: json['mensaje'] ?? '',
-      reporteId: (json['reporte_id'] ?? '').toString(),
-      latitud: (json['latitud'] ?? json['lat'] ?? 0.0).toDouble(),
-      longitud: (json['longitud'] ?? json['lon'] ?? 0.0).toDouble(),
-      notaVoz: json['nota_voz'] ?? '',
-      rutaId: json['ruta_id'] ?? '',
-      timestamp: DateTime.tryParse(json['fecha_envio'] ?? json['timestamp'] ?? '') ?? DateTime.now(),
-      leida: json['leida'] ?? false,
-    );
+  NotificacionEntity _mapJsonToNotificacion(Map<String, dynamic> json) {
+    return NotificacionEntity.fromJson(json);
   }
 
   void escucharRuta(String rutaId) {
@@ -152,7 +117,7 @@ class NotificacionProvider extends ChangeNotifier {
     _desconectarWS();
 
     try {
-      final baseUri = Uri.parse(api.baseUrl);
+      final baseUri = Uri.parse(repository.baseUrl);
       final wsUri = baseUri.replace(
         scheme: baseUri.isScheme('https') ? 'wss' : 'ws',
         path: '/ws/alertas/$rutaId',

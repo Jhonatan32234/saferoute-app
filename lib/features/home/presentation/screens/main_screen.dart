@@ -17,7 +17,7 @@ import 'package:saferoute_app/features/rutas/presentation/widgets/ruta_pill_widg
 import 'package:saferoute_app/features/login/presentation/providers/auth_provider.dart';
 import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
 
-import 'package:saferoute_app/domain/entities/notificacion.dart';
+import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion_entity.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
 
@@ -213,7 +213,7 @@ class _MainScreenState extends State<MainScreen> {
     final mapaProvider = _mapaProvider;
     final notiProvider = _notiProvider;
     if (!mapaProvider.zonaInicializada) {
-      mapaProvider.actualizarZonaUbicacion(notiProvider);
+      mapaProvider.actualizarZonaUbicacion();
     }
   }
 
@@ -357,7 +357,6 @@ class _MainScreenState extends State<MainScreen> {
           GestureDetector(
             onTap: () {
               auth.logout();
-              Navigator.pushReplacementNamed(context, '/');
             },
             child: Container(
               width: 36.r,
@@ -452,7 +451,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           Positioned(
-            bottom: 24.h,
+            bottom: MediaQuery.of(context).padding.bottom + 16.h,
             left: 16.w,
             right: 16.w,
             child: Column(
@@ -809,7 +808,7 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _mostrarDetalleAlerta(Notificacion alerta) {
+  void _mostrarDetalleAlerta(NotificacionEntity alerta) {
     showDialog(
       context: context,
       builder: (_) => Dialog(

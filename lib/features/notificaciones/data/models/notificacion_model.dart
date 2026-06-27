@@ -1,10 +1,16 @@
-import '../../domain/entities/notificacion_entity.dart';
+﻿import '../../domain/entities/notificacion_entity.dart';
 
 class NotificacionModel extends NotificacionEntity {
   NotificacionModel({
-    required super.id, required super.tipo, required super.mensaje,
-    required super.reporteId, required super.latitud, required super.longitud,
-    required super.notaVoz, required super.rutaId, required super.timestamp,
+    required super.id,
+    required super.tipo,
+    required super.mensaje,
+    required super.reporteId,
+    required super.latitud,
+    required super.longitud,
+    required super.notaVoz,
+    required super.rutaId,
+    required super.timestamp,
     required super.leida,
   });
 
@@ -20,6 +26,21 @@ class NotificacionModel extends NotificacionEntity {
       rutaId: json['ruta_id'] ?? '',
       timestamp: DateTime.tryParse(json['fecha_envio'] ?? json['timestamp'] ?? '') ?? DateTime.now(),
       leida: json['leida'] ?? false,
+    );
+  }
+
+  NotificacionEntity toEntity() {
+    return NotificacionEntity(
+      id: id,
+      tipo: tipo,
+      mensaje: mensaje,
+      reporteId: reporteId,
+      latitud: latitud,
+      longitud: longitud,
+      notaVoz: notaVoz,
+      rutaId: rutaId,
+      timestamp: timestamp,
+      leida: leida,
     );
   }
 }

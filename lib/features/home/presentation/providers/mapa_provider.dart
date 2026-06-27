@@ -8,8 +8,6 @@ import 'package:injectable/injectable.dart';
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
 
-import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
-
 @injectable
 class MapaProvider extends ChangeNotifier {
   // Ahora usamos el repositorio específico del Home
@@ -118,7 +116,7 @@ class MapaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void actualizarZonaUbicacion(NotificacionProvider notiProvider) {
+  void actualizarZonaUbicacion() {
     if (_zonaInicializada) return;
     _zonaInicializada = true;
   }

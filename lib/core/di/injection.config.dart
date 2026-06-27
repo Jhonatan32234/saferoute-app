@@ -97,7 +97,7 @@ extension GetItInjectableX on _i174.GetIt {
         _i464.NotificacionRepositoryImpl(
             gh<_i842.NotificacionRemoteDataSource>()));
     gh.factory<_i740.NotificacionProvider>(
-        () => _i740.NotificacionProvider(gh<_i842.NotificacionRemoteDataSource>()));
+        () => _i740.NotificacionProvider(gh<_i931.INotificacionRepository>()));
     gh.factory<_i117.ReporteProvider>(() => _i117.ReporteProvider(
           gh<_i987.IReporteRepository>(),
           gh<_i558.FlutterSecureStorage>(),

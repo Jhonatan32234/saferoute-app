@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion_entity.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
-import 'package:saferoute_app/domain/entities/notificacion.dart';
 
 class NotificacionesPanel extends StatelessWidget {
   final Function(double lat, double lon)? onNotificacionTap;
 
   const NotificacionesPanel({super.key, this.onNotificacionTap});
 
-  void _mostrarDetalles(BuildContext context, Notificacion n) {
+  void _mostrarDetalles(BuildContext context, NotificacionEntity n) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -107,7 +107,7 @@ class NotificacionesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notiProvider = context.watch<NotificacionProvider>();
-    final notifications = notiProvider.notificaciones;
+    final List<NotificacionEntity> notifications = notiProvider.notificaciones;
 
     return Container(
       constraints: BoxConstraints(
@@ -170,7 +170,7 @@ class NotificacionesPanel extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 8.h),
                 itemCount: notifications.length,
                 itemBuilder: (context, index) {
-                  final n = notifications[index];
+                  final NotificacionEntity n = notifications[index];
                   return Opacity(
                     opacity: n.leida ? 0.7 : 1.0,
                     child: Card(
