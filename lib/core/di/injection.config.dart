@@ -37,6 +37,14 @@ import '../../features/notificaciones/domain/repositories/notification_repositor
     as _i931;
 import '../../features/notificaciones/presentation/providers/notificacion_provider.dart'
     as _i740;
+import '../../features/profile/data/datasources/profile_remote_datasource.dart'
+    as _i327;
+import '../../features/profile/data/repositories_impl/profile_repository_impl.dart'
+    as _i357;
+import '../../features/profile/domain/repositories/profile_repository.dart'
+    as _i894;
+import '../../features/profile/presentation/providers/profile_provider.dart'
+    as _i919;
 import '../../features/reportes/data/datasources/reportes_remote_datasource.dart'
     as _i804;
 import '../../features/reportes/data/repositories_impl/reporte_repository_impl.dart'
@@ -80,11 +88,18 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i519.Client>(),
               gh<_i170.DotEnv>(),
             ));
+    gh.lazySingleton<_i327.ProfileRemoteDataSource>(
+        () => _i327.ProfileRemoteDataSource(
+              gh<_i519.Client>(),
+              gh<_i170.DotEnv>(),
+            ));
     gh.lazySingleton<_i804.ReportesRemoteDataSource>(
         () => _i804.ReportesRemoteDataSource(
               gh<_i519.Client>(),
               gh<_i170.DotEnv>(),
             ));
+    gh.lazySingleton<_i894.IProfileRepository>(
+        () => _i357.ProfileRepositoryImpl(gh<_i327.ProfileRemoteDataSource>()));
     gh.lazySingleton<_i987.IReporteRepository>(() =>
         _i240.ReporteRepositoryImpl(gh<_i804.ReportesRemoteDataSource>()));
     gh.lazySingleton<_i268.IAuthRepository>(() => _i337.AuthRepositoryImpl(
@@ -93,17 +108,19 @@ extension GetItInjectableX on _i174.GetIt {
         ));
     gh.factory<_i787.AuthProvider>(
         () => _i787.AuthProvider(gh<_i268.IAuthRepository>()));
+    gh.factory<_i919.ProfileProvider>(
+        () => _i919.ProfileProvider(gh<_i894.IProfileRepository>()));
     gh.lazySingleton<_i931.INotificacionRepository>(() =>
         _i464.NotificacionRepositoryImpl(
             gh<_i842.NotificacionRemoteDataSource>()));
-    gh.factory<_i740.NotificacionProvider>(
-        () => _i740.NotificacionProvider(gh<_i931.INotificacionRepository>()));
     gh.factory<_i117.ReporteProvider>(() => _i117.ReporteProvider(
           gh<_i987.IReporteRepository>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
     gh.lazySingleton<_i0.IHomeRepository>(
         () => _i90.HomeRepositoryImpl(gh<_i278.HomeRemoteDataSource>()));
+    gh.factory<_i740.NotificacionProvider>(
+        () => _i740.NotificacionProvider(gh<_i931.INotificacionRepository>()));
     gh.factory<_i1031.MapaProvider>(
         () => _i1031.MapaProvider(gh<_i0.IHomeRepository>()));
     return this;

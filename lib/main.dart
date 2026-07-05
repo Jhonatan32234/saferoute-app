@@ -9,6 +9,7 @@ import 'package:saferoute_app/features/login/presentation/providers/auth_provide
 import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
 import 'package:saferoute_app/features/reportes/presentation/providers/reporte_provider.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/profile/presentation/providers/profile_provider.dart';
 import 'package:saferoute_app/features/login/presentation/screens/login_screen.dart';
 import 'package:saferoute_app/features/home/presentation/screens/main_screen.dart';
 import 'package:saferoute_app/core/widgets/usb_debug_blocker.dart';
@@ -54,6 +55,13 @@ class SafeRouteApp extends StatelessWidget {
         ),
         ChangeNotifierProxyProvider<AuthProvider, NotificacionProvider>(
           create: (_) => getIt<NotificacionProvider>(),
+          update: (_, auth, provider) {
+            provider!.token = auth.token ?? '';
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ProfileProvider>(
+          create: (_) => getIt<ProfileProvider>(),
           update: (_, auth, provider) {
             provider!.token = auth.token ?? '';
             return provider;

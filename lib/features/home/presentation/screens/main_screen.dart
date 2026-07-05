@@ -20,6 +20,7 @@ import 'package:saferoute_app/features/home/presentation/providers/mapa_provider
 import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion_entity.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
+import 'package:saferoute_app/features/profile/presentation/screens/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -356,7 +357,30 @@ class _MainScreenState extends State<MainScreen> {
           SizedBox(width: 8.w),
           GestureDetector(
             onTap: () {
-              auth.logout();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+            child: Container(
+              width: 36.r,
+              height: 36.r,
+              decoration: BoxDecoration(
+                color: AppColors.white.withOpacity(0.7),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.slate200),
+              ),
+              child: Icon(
+                Icons.person_outline,
+                size: 18.r,
+                color: AppColors.slate700,
+              ),
+            ),
+          ),
+          SizedBox(width: 8.w),
+          GestureDetector(
+            onTap: () async {
+              await auth.logout();
             },
             child: Container(
               width: 36.r,

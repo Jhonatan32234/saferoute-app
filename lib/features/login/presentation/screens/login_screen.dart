@@ -10,9 +10,7 @@ import '../../../../core/widgets/app_text_field.dart';
 // Import hacia el provider del mismo feature
 import '../providers/auth_provider.dart';
 
-import '../../../home/presentation/screens//main_screen.dart';
-
-class LoginScreen extends StatefulWidget { // Renombrado a Screen
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
@@ -29,7 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Agendamos la carga para después del primer render
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cargarCredencialesGuardadas();
     });
@@ -57,18 +54,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.login(
+    // Simplemente llamamos al login. 
+    // Como el _AppRouter en main.dart está escuchando al AuthProvider,
+    // cuando success sea true y se notifiquen los cambios, 
+    // el router cambiará automáticamente a MainScreen.
+    await auth.login(
       _emailController.text.trim(),
       _passwordController.text,
       recordar: _recordarDatos,
     );
-
-    if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    }
   }
 
   @override
@@ -80,7 +74,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Fondo con gradiente personalizado
             Container(
               width: double.infinity,
               height: double.infinity,
@@ -89,13 +82,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFFEEF6FF), // Azul muy claro (arriba)
-                    Color(0xFFF0FDF4), // Verde muy claro (abajo)
+                    Color(0xFFEEF6FF),
+                    Color(0xFFF0FDF4),
                   ],
                 ),
               ),
             ),
-            // Círculo azul decorativo (esquina superior derecha)
             Positioned(
               top: -60.h,
               right: -60.w,
@@ -108,7 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            // Círculo verde decorativo (esquina inferior izquierda)
             Positioned(
               bottom: -50.h,
               left: -50.w,
@@ -121,7 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            // Contenido
             Center(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(24.r),
@@ -133,7 +123,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Logo Cuadrado
                         Center(
                           child: Container(
                             width: 90.r,
@@ -178,8 +167,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         SizedBox(height: 32.h),
-
-                        // Card de login
                         Container(
                           padding: EdgeInsets.all(24.r),
                           decoration: BoxDecoration(
@@ -217,8 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               SizedBox(height: 24.h),
-
-                              // Email
                               AppTextField(
                                 controller: _emailController,
                                 label: 'Correo electrónico',
@@ -231,8 +216,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 },
                               ),
                               SizedBox(height: 16.h),
-
-                              // Password
                               AppTextField(
                                 controller: _passwordController,
                                 label: 'Contraseña',
@@ -258,10 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   return null;
                                 },
                               ),
-
                               SizedBox(height: 16.h),
-
-                              // Recordar datos
                               Row(
                                 children: [
                                   SizedBox(
@@ -288,10 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ],
                               ),
-
                               SizedBox(height: 24.h),
-
-                              // Error
                               if (auth.error != null)
                                 Container(
                                   padding: EdgeInsets.all(12.r),
@@ -323,8 +300,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               if (auth.error != null) SizedBox(height: 16.h),
-
-                              // Botón de login
                               GestureDetector(
                                 onTap: auth.isLoading ? null : _login,
                                 child: Container(

@@ -70,22 +70,49 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> inicializarUbicacion() async {
     try {
-      final servicio = await Geolocator.isLocationServiceEnabled();
-      if (!servicio) return;
-
-      var permiso = await Geolocator.checkPermission();
-      if (permiso == LocationPermission.denied) {
-        permiso = await Geolocator.requestPermission();
-        if (permiso != LocationPermission.whileInUse && permiso != LocationPermission.always) return;
+      // 1. Verificar y pedir permisos SI O SI primero, sin importar si el servicio está activo aún
+      LocationPermission permission = await Geolocator.checkPermission();
+      
+      if (permission == LocationPermission.denied) {
+        debugPrint("📍 [GPS] Permisos denegados, solicitando...");
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint("📍 [GPS] Permisos denegados permanentemente.");
+        return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      _ubicacionActual = LatLng(pos.latitude, pos.longitude);
-      notifyListeners();
+      // 2. Si tenemos permiso (ya sea porque ya estaba o porque se concedió ahora)
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        // Verificar si el servicio está habilitado (informativo)
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          debugPrint("📍 [GPS] Servicio de ubicación desactivado en el sistema.");
+        }
 
-      _iniciarRastreoGPS();
+        // 3. Obtener posición actual con un timeout para evitar bloqueos infinitos
+        Position? pos;
+        try {
+          pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 8),
+          );
+        } catch (e) {
+          debugPrint("📍 [GPS] Error/Timeout obteniendo posición actual, probando última conocida: $e");
+          pos = await Geolocator.getLastKnownPosition();
+        }
+
+        if (pos != null) {
+          _ubicacionActual = LatLng(pos.latitude, pos.longitude);
+          notifyListeners();
+        }
+
+        // 4. Iniciar el rastreo en tiempo real
+        _iniciarRastreoGPS();
+      }
     } catch (e) {
-      debugPrint("GPS error: $e");
+      debugPrint("📍 [GPS] Error crítico en inicializarUbicacion: $e");
     }
   }
 

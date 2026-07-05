@@ -4,7 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../domain/repositories/auth_repository.dart';
 
-@injectable
+@lazySingleton
 class AuthProvider extends ChangeNotifier {
   final IAuthRepository authRepository;
 
@@ -21,7 +21,7 @@ class AuthProvider extends ChangeNotifier {
   String? get tipo => _tipo;
   bool get isLoading => _isLoading;
   bool get inicializado => _inicializado;
-  bool get isLoggedIn => _token != null && !sesionExpirada;
+  bool get isLoggedIn => _token != null && _token!.isNotEmpty && !sesionExpirada;
   String? get error => _error;
 
   AuthProvider(this.authRepository) {
@@ -87,7 +87,6 @@ class AuthProvider extends ChangeNotifier {
         return await _intentoLoginOffline(email, password);
       }
 
-      // AQUÍ ESTÁ EL CAMBIO: Recibimos un UserEntity
       final user = await authRepository.login(email, password);
       _token = user.token;
       _nombre = user.nombre;
@@ -104,6 +103,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _isLoading = false;
+      _error = null;
       notifyListeners();
       return true;
     } catch (e) {
@@ -155,12 +155,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await authRepository.logout();
+    // 1. Limpiar estado local inmediatamente para que la UI reaccione rápido
     _token = null;
     _nombre = null;
     _tipo = null;
     _ultimaActividad = null;
+    _error = null;
     _inicializado = true;
     notifyListeners();
+
+    // 2. Limpiar persistencia en segundo plano
+    try {
+      await authRepository.logout();
+    } catch (e) {
+      debugPrint("Error al limpiar sesión en repositorio: \$e");
+    }
   }
 }
