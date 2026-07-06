@@ -3,8 +3,8 @@ class RutaEntity {
   final String nombre;
   final String seguridad;
   final List<dynamic> coordenadas;
+  final String polyline; // <--- Campo para la polilínea codificada
 
-  // Nuevas variables requeridas por tu UI
   final double distanciaKm;
   final int tiempoMinutos;
   final String tipo;
@@ -15,6 +15,7 @@ class RutaEntity {
     required this.nombre,
     required this.seguridad,
     required this.coordenadas,
+    required this.polyline,
     required this.distanciaKm,
     required this.tiempoMinutos,
     required this.tipo,

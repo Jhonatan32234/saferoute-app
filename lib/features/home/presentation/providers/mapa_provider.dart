@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:injectable/injectable.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Imports absolutos a tu propia feature
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
@@ -10,22 +15,20 @@ import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {
-  // Ahora usamos el repositorio específico del Home
   final IHomeRepository homeRepository;
+  final DotEnv _dotenv;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  
   String _token = '';
+  String _userId = '';
   bool _zonaInicializada = false;
 
-  MapaProvider(this.homeRepository);
+  MapaProvider(this.homeRepository, this._dotenv);
 
-  set token(String nuevoToken) {
-    _token = nuevoToken;
-  }
-
-  String get token => _token;
+  set token(String nuevoToken) => _token = nuevoToken;
+  set userId(String id) => _userId = id;
 
   LatLng _ubicacionActual = const LatLng(16.753, -93.115);
-
-  // ¡CAMBIO CLAVE! Ahora es una lista de entidades, no de mapas crudos
   List<RutaEntity> _rutas = [];
   bool _cargandoRutas = false;
   String? _error;
@@ -44,7 +47,15 @@ class MapaProvider extends ChangeNotifier {
   StreamSubscription<Position>? _posicionStream;
   bool _rastreoActivo = false;
 
-  // Getters actualizados
+  // --- Propiedades del Viaje ---
+  String? _viajeId;
+  bool _enViaje = false;
+  bool _viajeCargando = false;
+  bool _desviado = false;
+  WebSocketChannel? _socket;
+  Timer? _telemetriaTimer;
+  
+  // Getters
   LatLng get ubicacionActual => _ubicacionActual;
   List<RutaEntity> get rutas => _rutas;
   bool get cargandoRutas => _cargandoRutas;
@@ -54,12 +65,17 @@ class MapaProvider extends ChangeNotifier {
   bool get mostrarSoloSeleccionada => _mostrarSoloSeleccionada;
   LatLng? get origenBusqueda => _origenBusqueda;
   LatLng? get destinoBusqueda => _destinoBusqueda;
-
+  
   String get textoOrigen => _textoOrigen;
   String get textoDestino => _textoDestino;
   bool get usarUbicacionActualPersistente => _usarUbicacionActualPersistente;
   bool get zonaInicializada => _zonaInicializada;
   bool get rastreoActivo => _rastreoActivo;
+
+  bool get enViaje => _enViaje;
+  bool get viajeCargando => _viajeCargando;
+  bool get desviado => _desviado;
+  String? get viajeId => _viajeId;
 
   void guardarTextosBusqueda({String? origen, String? destino, bool? usarUbicacion}) {
     if (origen != null) _textoOrigen = origen;
@@ -70,28 +86,13 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> inicializarUbicacion() async {
     try {
-      // 1. Verificar y pedir permisos SI O SI primero, sin importar si el servicio está activo aún
       LocationPermission permission = await Geolocator.checkPermission();
-      
       if (permission == LocationPermission.denied) {
-        debugPrint("📍 [GPS] Permisos denegados, solicitando...");
         permission = await Geolocator.requestPermission();
       }
-      
-      if (permission == LocationPermission.deniedForever) {
-        debugPrint("📍 [GPS] Permisos denegados permanentemente.");
-        return;
-      }
+      if (permission == LocationPermission.deniedForever) return;
 
-      // 2. Si tenemos permiso (ya sea porque ya estaba o porque se concedió ahora)
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        // Verificar si el servicio está habilitado (informativo)
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          debugPrint("📍 [GPS] Servicio de ubicación desactivado en el sistema.");
-        }
-
-        // 3. Obtener posición actual con un timeout para evitar bloqueos infinitos
         Position? pos;
         try {
           pos = await Geolocator.getCurrentPosition(
@@ -99,7 +100,6 @@ class MapaProvider extends ChangeNotifier {
             timeLimit: const Duration(seconds: 8),
           );
         } catch (e) {
-          debugPrint("📍 [GPS] Error/Timeout obteniendo posición actual, probando última conocida: $e");
           pos = await Geolocator.getLastKnownPosition();
         }
 
@@ -107,34 +107,26 @@ class MapaProvider extends ChangeNotifier {
           _ubicacionActual = LatLng(pos.latitude, pos.longitude);
           notifyListeners();
         }
-
-        // 4. Iniciar el rastreo en tiempo real
         _iniciarRastreoGPS();
       }
     } catch (e) {
-      debugPrint("📍 [GPS] Error crítico en inicializarUbicacion: $e");
+      debugPrint("📍 [GPS] Error: $e");
     }
   }
 
   void _iniciarRastreoGPS() {
     _rastreoActivo = true;
     _posicionStream?.cancel();
-
     _posicionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
       ),
-    ).listen(
-          (Position posicion) {
-        if (!_rastreoActivo) return;
-        _ubicacionActual = LatLng(posicion.latitude, posicion.longitude);
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error GPS stream: $error');
-      },
-    );
+    ).listen((Position pos) {
+      if (!_rastreoActivo) return;
+      _ubicacionActual = LatLng(pos.latitude, pos.longitude);
+      notifyListeners();
+    });
   }
 
   void detenerRastreoGPS() {
@@ -146,6 +138,7 @@ class MapaProvider extends ChangeNotifier {
   void actualizarZonaUbicacion() {
     if (_zonaInicializada) return;
     _zonaInicializada = true;
+    notifyListeners();
   }
 
   Future<void> buscarRutas({
@@ -164,7 +157,6 @@ class MapaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Llamada al repositorio puro que devuelve List<RutaEntity>
       _rutas = await homeRepository.getRutas(
         origenLat: origenLat,
         origenLon: origenLon,
@@ -175,7 +167,6 @@ class MapaProvider extends ChangeNotifier {
 
       _polilineas = [];
       for (final ruta in _rutas) {
-        // Accedemos a la propiedad .coordenadas del objeto
         if (ruta.coordenadas.isNotEmpty) {
           _polilineas.add(ruta.coordenadas
               .map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble()))
@@ -225,8 +216,149 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> cargarClusters() async {}
 
+  // --- LÓGICA DE VIAJES ---
+
+  Future<void> iniciarViaje() async {
+    if (_rutaSeleccionada == null) return;
+    
+    _viajeCargando = true;
+    notifyListeners();
+
+    try {
+      final id = await homeRepository.iniciarViaje(
+        origenLat: _origenBusqueda!.latitude,
+        origenLon: _origenBusqueda!.longitude,
+        destinoLat: _destinoBusqueda!.latitude,
+        destinoLon: _destinoBusqueda!.longitude,
+        polylineRuta: _rutaSeleccionada!.polyline, // <--- CAMBIO: Ahora usamos .polyline en vez de .id
+        rutaId: _rutaSeleccionada!.nombre,
+        token: _token,
+      );
+
+      _viajeId = id;
+      _enViaje = true;
+      await _storage.write(key: 'viaje_id_activo', value: id);
+
+      _conectarWebSocket();
+
+      _telemetriaTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+        _enviarTelemetriaActual();
+      });
+
+    } catch (e) {
+      _error = "Error al iniciar viaje: $e";
+    } finally {
+      _viajeCargando = false;
+      notifyListeners();
+    }
+  }
+
+  void _conectarWebSocket() {
+    if (_viajeId == null) return;
+    
+    final wsBaseUrl = _dotenv.maybeGet('WS_BASE_URL') ?? 'ws://10.0.2.2:8080';
+    final wsUrl = "$wsBaseUrl/ws/alertas/${_rutaSeleccionada?.nombre}?user_id=$_userId";
+    
+    try {
+      _socket = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _socket!.stream.listen((message) {
+        final data = jsonDecode(message);
+        if (data['tipo'] == 'telemetria_ack') {
+          if (data['estado_viaje'] == 'desviado') {
+            _manejarDesvio();
+          } else {
+            _desviado = false;
+            notifyListeners();
+          }
+        }
+      }, onError: (err) {
+        debugPrint("WS Error: $err");
+      }, onDone: () {
+        debugPrint("WS Cerrado");
+      });
+    } catch (e) {
+      debugPrint("Error conectando WS: $e");
+    }
+  }
+
+  void _enviarTelemetriaActual() async {
+    if (_socket == null || !_enViaje) return;
+
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final payload = {
+        "tipo": "telemetria",
+        "lat": pos.latitude,
+        "lon": pos.longitude,
+        "velocidad_kmh": pos.speed * 3.6,
+        "ruta_id": _rutaSeleccionada?.nombre,
+        "timestamp": DateTime.now().toIso8601String()
+      };
+      _socket!.sink.add(jsonEncode(payload));
+    } catch (e) {
+      debugPrint("Error enviando telemetria: $e");
+    }
+  }
+
+  void _manejarDesvio() {
+    if (!_desviado) {
+      _desviado = true;
+      HapticFeedback.vibrate();
+      notifyListeners();
+    }
+  }
+
+  Future<bool> finalizarViaje({String? password}) async {
+    if (_viajeId == null) return false;
+
+    _viajeCargando = true;
+    notifyListeners();
+
+    try {
+      final exito = await homeRepository.finalizarViaje(
+        viajeId: _viajeId!,
+        password: password,
+        token: _token,
+      );
+
+      if (exito) {
+        _limpiarViaje();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = "Error al finalizar: $e";
+      return false;
+    } finally {
+      _viajeCargando = false;
+      notifyListeners();
+    }
+  }
+
+  void _limpiarViaje() {
+    _enViaje = false;
+    _viajeId = null;
+    _desviado = false;
+    _telemetriaTimer?.cancel();
+    _socket?.sink.close();
+    _storage.delete(key: 'viaje_id_activo');
+    limpiarBusqueda();
+  }
+
+  double calcularDistanciaAlDestino() {
+    if (_destinoBusqueda == null) return double.infinity;
+    return Geolocator.distanceBetween(
+      _ubicacionActual.latitude,
+      _ubicacionActual.longitude,
+      _destinoBusqueda!.latitude,
+      _destinoBusqueda!.longitude,
+    );
+  }
+
   @override
   void dispose() {
+    _telemetriaTimer?.cancel();
+    _socket?.sink.close();
     _posicionStream?.cancel();
     super.dispose();
   }

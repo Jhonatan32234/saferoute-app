@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-
-// Imports absolutos
+import 'package:saferoute_app/core/theme/app_colors.dart';
 import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
-// Asumiendo que ruta_card.dart está en la misma carpeta
 import 'ruta_card.dart';
 
 class RutaPillWidget extends StatelessWidget {
@@ -14,56 +12,58 @@ class RutaPillWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final mapaProvider = context.watch<MapaProvider>();
 
-    if (mapaProvider.cargandoRutas) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        decoration: _pillDecoration(),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(width: 18.r, height: 18.r, child: const CircularProgressIndicator(strokeWidth: 2)),
-            SizedBox(width: 12.w),
-            Text('Calculando rutas...', style: TextStyle(fontSize: 13.sp)),
-          ],
-        ),
-      );
+    if (mapaProvider.cargandoRutas || mapaProvider.viajeCargando) {
+      return _buildLoading(mapaProvider.viajeCargando ? 'Iniciando viaje...' : 'Calculando rutas...');
+    }
+
+    if (mapaProvider.enViaje) {
+      return _buildViajeActivo(context, mapaProvider);
     }
 
     if (mapaProvider.mostrarSoloSeleccionada && mapaProvider.rutaSeleccionada != null) {
       final ruta = mapaProvider.rutaSeleccionada!;
       return Container(
-        padding: EdgeInsets.all(10.r),
+        padding: EdgeInsets.all(12.r),
         decoration: _pillDecoration(),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 4.w, height: 32.h,
-              decoration: BoxDecoration(
-                // CAMBIO: ruta.seguridad
-                color: _colorSeguridad(ruta.seguridad),
-                borderRadius: BorderRadius.circular(2.r),
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // CAMBIO: ruta.nombre
-                  Text(ruta.nombre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
-                  // CAMBIO: ruta.distanciaKm y ruta.tiempoMinutos
-                  Text(
-                    '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 11.sp),
+            Row(
+              children: [
+                _buildIndicator(ruta.seguridad),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ruta.nombre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                      Text(
+                        '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12.sp),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, size: 22.r, color: Colors.grey),
+                  onPressed: () => mapaProvider.mostrarTodasLasRutas(),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(Icons.close, size: 20.r, color: Colors.grey),
-              onPressed: () => mapaProvider.mostrarTodasLasRutas(),
-              tooltip: 'Ver todas las opciones',
+            SizedBox(height: 12.h),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => mapaProvider.iniciarViaje(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  elevation: 0,
+                ),
+                child: Text('Iniciar Viaje Seguro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+              ),
             ),
           ],
         ),
@@ -72,26 +72,23 @@ class RutaPillWidget extends StatelessWidget {
 
     if (mapaProvider.rutas.isNotEmpty) {
       return Container(
-        constraints: BoxConstraints(maxHeight: 280.h),
-        padding: EdgeInsets.all(10.r),
+        constraints: BoxConstraints(maxHeight: 300.h),
+        padding: EdgeInsets.all(12.r),
         decoration: _pillDecoration(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Text('Opciones de Ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                Text('Rutas encontradas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => mapaProvider.limpiarBusqueda(),
-                  child: Padding(
-                    padding: EdgeInsets.all(4.r),
-                    child: Icon(Icons.close, size: 20.r, color: Colors.grey),
-                  ),
+                  child: Icon(Icons.close, size: 22.r, color: Colors.grey),
                 ),
               ],
             ),
-            SizedBox(height: 8.h),
+            SizedBox(height: 10.h),
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
@@ -99,7 +96,6 @@ class RutaPillWidget extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final ruta = mapaProvider.rutas[index];
                   return RutaCard(
-                    // CAMBIO: Todas las propiedades usan sintaxis de punto
                     nombre: ruta.nombre,
                     tipo: ruta.tipo,
                     seguridad: ruta.seguridad,
@@ -119,19 +115,165 @@ class RutaPillWidget extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
+  Widget _buildViajeActivo(BuildContext context, MapaProvider provider) {
+    final distanciaM = provider.calcularDistanciaAlDestino();
+    final puedeFinalizarNormal = distanciaM <= 50;
+
+    return Container(
+      padding: EdgeInsets.all(12.r),
+      decoration: _pillDecoration().copyWith(
+        border: provider.desviado ? Border.all(color: AppColors.danger, width: 2.r) : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (provider.desviado)
+            Container(
+              margin: EdgeInsets.only(bottom: 8.h),
+              padding: EdgeInsets.symmetric(vertical: 4.h, horizontal: 8.w),
+              decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(6.r)),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.white, size: 16.r),
+                  SizedBox(width: 8.w),
+                  Text('DESVÍO DETECTADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.sp)),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              Icon(Icons.navigation, color: AppColors.primary, size: 24.r),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('En trayecto a destino', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                    Text(
+                      distanciaM > 1000 ? '${(distanciaM / 1000).toStringAsFixed(1)} km restantes' : '${distanciaM.toInt()} metros restantes',
+                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12.sp),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => _confirmarFinalizacion(context, provider, puedeFinalizarNormal),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: puedeFinalizarNormal ? AppColors.success : AppColors.danger,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+                child: const Text('Finalizar'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarFinalizacion(BuildContext context, MapaProvider provider, bool normal) {
+    if (normal) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('¿Has llegado?'),
+          content: const Text('Confirma que has llegado a tu destino de forma segura.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                provider.finalizarViaje();
+              },
+              child: const Text('Llegué seguro'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final controller = TextEditingController();
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Finalización Anticipada'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Aún estás lejos del destino. Por seguridad, ingresa tu contraseña para detener el seguimiento.'),
+              SizedBox(height: 16.h),
+              TextField(
+                controller: controller,
+                obscureText: true,
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Contraseña'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Volver al viaje')),
+            ElevatedButton(
+              onPressed: () async {
+                final exito = await provider.finalizarViaje(password: controller.text);
+                if (exito) {
+                  if (context.mounted) Navigator.pop(ctx);
+                } else {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Contraseña incorrecta. El seguimiento continúa.')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
+              child: const Text('Detener seguimiento'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildLoading(String msg) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: _pillDecoration(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: 18.r, height: 18.r, child: const CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 12.w),
+          Text(msg, style: TextStyle(fontSize: 13.sp)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIndicator(String seguridad) {
+    return Container(
+      width: 6.w, height: 35.h,
+      decoration: BoxDecoration(
+        color: _colorSeguridad(seguridad),
+        borderRadius: BorderRadius.circular(3.r),
+      ),
+    );
+  }
+
   BoxDecoration _pillDecoration() {
     return BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(10.r),
-      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10.r)],
+      borderRadius: BorderRadius.circular(16.r),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15.r, offset: const Offset(0, 4)),
+      ],
     );
   }
 
   Color _colorSeguridad(String seguridad) {
     switch (seguridad) {
-      case 'verde': return Colors.green;
-      case 'amarillo': return Colors.orange;
-      case 'rojo': return Colors.red;
+      case 'verde': return AppColors.riskLow;
+      case 'amarillo': return AppColors.riskMedium;
+      case 'rojo': return AppColors.riskHigh;
       default: return Colors.grey;
     }
   }

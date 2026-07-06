@@ -106,7 +106,7 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1033.LoginRemoteDataSource>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
-    gh.factory<_i787.AuthProvider>(
+    gh.lazySingleton<_i787.AuthProvider>(
         () => _i787.AuthProvider(gh<_i268.IAuthRepository>()));
     gh.factory<_i919.ProfileProvider>(
         () => _i919.ProfileProvider(gh<_i894.IProfileRepository>()));
@@ -121,8 +121,10 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i90.HomeRepositoryImpl(gh<_i278.HomeRemoteDataSource>()));
     gh.factory<_i740.NotificacionProvider>(
         () => _i740.NotificacionProvider(gh<_i931.INotificacionRepository>()));
-    gh.factory<_i1031.MapaProvider>(
-        () => _i1031.MapaProvider(gh<_i0.IHomeRepository>()));
+    gh.factory<_i1031.MapaProvider>(() => _i1031.MapaProvider(
+          gh<_i0.IHomeRepository>(),
+          gh<_i170.DotEnv>(),
+        ));
     return this;
   }
 }
