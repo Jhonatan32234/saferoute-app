@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../models/ruta_model.dart';
+import '../models/destino_reciente_model.dart';
 
 @lazySingleton
 class HomeRemoteDataSource {
@@ -38,9 +39,6 @@ class HomeRemoteDataSource {
 
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      // DEBUG: Imprime el JSON para ver los nombres de los campos
-      log('📦 API Rutas Response: ${response.body}');
-      
       final List<dynamic> jsonList = decoded['rutas'] ?? [];
       return jsonList.map((json) => RutaModel.fromJson(json)).toList();
     }
@@ -65,9 +63,6 @@ class HomeRemoteDataSource {
       'ruta_id': rutaId,
     };
     
-    // DEBUG: Ver qué estamos enviando exactamente
-    log('🚀 Enviando a /viajes/iniciar: ${jsonEncode(payload)}');
-
     final response = await client.post(
       Uri.parse('$baseUrl/api/viajes/iniciar'),
       headers: {
@@ -108,5 +103,62 @@ class HomeRemoteDataSource {
     );
 
     return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  // --- DESTINOS RECIENTES ---
+
+  Future<List<DestinoRecienteModel>> getDestinosRecientes(String token) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/api/user/destinos?limite=10'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> list = decoded['destinos'] ?? [];
+      return list.map((json) => DestinoRecienteModel.fromJson(json)).toList();
+    }
+    throw Exception('Error cargando destinos recientes');
+  }
+
+  Future<void> guardarDestinoReciente({
+    required String nombre,
+    required double lat,
+    required double lon,
+    required String token,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/api/user/destinos'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'nombre': nombre,
+        'lat': lat,
+        'lon': lon,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Error guardando destino reciente');
+    }
+  }
+
+  Future<void> eliminarDestinoReciente(String id, String token) async {
+    final response = await client.delete(
+      Uri.parse('$baseUrl/api/user/destinos?id=$id'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Error eliminando destino reciente');
+    }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:injectable/injectable.dart';
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
+import 'package:saferoute_app/features/home/domain/entities/destino_reciente_entity.dart';
 import 'package:saferoute_app/features/home/data/datasources/home_remote_datasource.dart';
 
 @LazySingleton(as: IHomeRepository)
@@ -58,5 +59,32 @@ class HomeRepositoryImpl implements IHomeRepository {
       password: password,
       token: token,
     );
+  }
+
+  @override
+  Future<List<DestinoReciente>> getDestinosRecientes(String token) async {
+    final models = await _api.getDestinosRecientes(token);
+    // Cast explícito para asegurar compatibilidad de tipos en el override
+    return models.map((m) => m as DestinoReciente).toList();
+  }
+
+  @override
+  Future<void> guardarDestinoReciente({
+    required String nombre,
+    required double lat,
+    required double lon,
+    required String token,
+  }) async {
+    await _api.guardarDestinoReciente(
+      nombre: nombre,
+      lat: lat,
+      lon: lon,
+      token: token,
+    );
+  }
+
+  @override
+  Future<void> eliminarDestinoReciente(String id, String token) async {
+    await _api.eliminarDestinoReciente(id, token);
   }
 }

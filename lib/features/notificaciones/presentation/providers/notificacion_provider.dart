@@ -19,7 +19,11 @@ class NotificacionProvider extends ChangeNotifier {
   String? _currentRutaId;
   Timer? _pingTimer;
   Timer? _reconnectTimer;
-  Timer? _historialRefreshTimer; // NUEVO: Timer para refrescar historial
+  Timer? _historialRefreshTimer; 
+
+  // Nueva propiedad para alertas urgentes del admin
+  NotificacionEntity? _ultimaAlertaUrgente;
+  NotificacionEntity? get ultimaAlertaUrgente => _ultimaAlertaUrgente;
 
   NotificacionProvider(this.repository);
 
@@ -38,10 +42,14 @@ class NotificacionProvider extends ChangeNotifier {
 
   List<NotificacionEntity> get notificaciones => _notificaciones;
   List<NotificacionEntity> get alertasMapa => _alertasMapa;
-  int get sinLeer => _notificaciones.where((n) => !n.leida).length;
+  int get sinLeer => _notificaciones.where((n) => !n.leida && n.esAdmin).length;
   bool get conectado => _conectado;
 
-  // Inicia el refresco automático del historial cada 60 segundos
+  void limpiarAlertaUrgente() {
+    _ultimaAlertaUrgente = null;
+    notifyListeners();
+  }
+
   void _iniciarRefrescoHistorial() {
     _historialRefreshTimer?.cancel();
     cargarHistorial();
@@ -93,7 +101,7 @@ class NotificacionProvider extends ChangeNotifier {
   Future<void> marcarTodasLeidas() async {
     if (_token.isEmpty) return;
     for (var n in _notificaciones) {
-      n.leida = true;
+      if (n.esAdmin) n.leida = true;
     }
     notifyListeners();
 
@@ -103,10 +111,6 @@ class NotificacionProvider extends ChangeNotifier {
       debugPrint('❌ Error marcando todas como leídas: $e');
       cargarHistorial();
     }
-  }
-
-  NotificacionEntity _mapJsonToNotificacion(Map<String, dynamic> json) {
-    return NotificacionEntity.fromJson(json);
   }
 
   void escucharRuta(String rutaId) {
@@ -148,10 +152,7 @@ class NotificacionProvider extends ChangeNotifier {
     }
 
     if (data['tipo'] == 'alerta_proximidad') {
-      final notificacion = _mapJsonToNotificacion(data);
-      
-      // ✅ SOLO añadir a la lista de marcadores activos en el mapa
-      // Ya NO se añade al historial local (_notificaciones) para evitar duplicidad o spam
+      final notificacion = NotificacionEntity.fromJson(data);
       if (!_alertasMapa.any((n) => n.reporteId == notificacion.reporteId)) {
         _alertasMapa.add(notificacion);
         notifyListeners();
@@ -159,8 +160,15 @@ class NotificacionProvider extends ChangeNotifier {
       return;
     }
 
-    // Para cualquier otro mensaje de tipo notificación real que el servidor envíe por WS,
-    // refrescamos el historial desde la API.
+    if (data['tipo'] == 'alerta_incidente_admin') {
+      debugPrint('🔔 Alerta de administrador recibida via WS');
+      _ultimaAlertaUrgente = NotificacionEntity.fromJson(data);
+      cargarHistorial(); 
+      notifyListeners();
+      return;
+    }
+
+    // Para cualquier otro mensaje importante, refrescamos.
     cargarHistorial();
   }
 

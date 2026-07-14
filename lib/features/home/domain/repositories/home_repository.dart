@@ -1,4 +1,5 @@
-import '../entities/ruta_entity.dart';
+import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
+import 'package:saferoute_app/features/home/domain/entities/destino_reciente_entity.dart';
 
 abstract class IHomeRepository {
   Future<List<RutaEntity>> getRutas({
@@ -24,4 +25,16 @@ abstract class IHomeRepository {
     String? password,
     required String token,
   });
+
+  // --- DESTINOS RECIENTES ---
+  Future<List<DestinoReciente>> getDestinosRecientes(String token);
+  
+  Future<void> guardarDestinoReciente({
+    required String nombre,
+    required double lat,
+    required double lon,
+    required String token,
+  });
+
+  Future<void> eliminarDestinoReciente(String id, String token);
 }

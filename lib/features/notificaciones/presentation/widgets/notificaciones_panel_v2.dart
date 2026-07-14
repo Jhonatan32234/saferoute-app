@@ -1,4 +1,3 @@
-// lib/presentation/widgets/notificaciones_panel_v2.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,7 +13,11 @@ class NotificacionesPanelV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notiProvider = context.watch<NotificacionProvider>();
-    final notifications = notiProvider.notificaciones;
+    
+    // FILTRO: Solo mostrar notificaciones administrativas en el panel
+    final notifications = notiProvider.notificaciones
+        .where((n) => n.esAdmin)
+        .toList();
 
     return Container(
       constraints: BoxConstraints(maxHeight: 0.75.sh),
@@ -52,7 +55,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Alertas',
+                        'Centro de Mensajes',
                         style: TextStyle(
                           fontSize: 20.sp,
                           fontWeight: FontWeight.w800,
@@ -60,7 +63,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${notiProvider.sinLeer} alertas sin leer',
+                        '${notiProvider.sinLeer} mensajes de administración',
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: AppColors.slate400,
@@ -74,7 +77,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                     onPressed: () => notiProvider.marcarTodasLeidas(),
                     icon: Icon(Icons.done_all, size: 18.r, color: AppColors.primary),
                     label: Text(
-                      'Leer todas',
+                      'Leer todos',
                       style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -107,13 +110,13 @@ class NotificacionesPanelV2 extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.notifications_off_outlined,
+                      Icons.mail_outline,
                       size: 48.r,
                       color: AppColors.slate300,
                     ),
                     SizedBox(height: 12.h),
                     Text(
-                      'No hay alertas registradas',
+                      'No tienes mensajes del administrador',
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: AppColors.slate400,
@@ -145,8 +148,9 @@ class NotificacionesPanelV2 extends StatelessWidget {
       NotificacionEntity n,
       NotificacionProvider provider,
       ) {
-    final color = _getTipoColor(n.tipo);
-    final icon = _getTipoIcon(n.tipo);
+    // Para notificaciones de admin usamos un color azul distintivo si no tiene tipo específico
+    final color = n.esAdmin ? AppColors.primary : _getTipoColor(n.tipo);
+    final icon = n.esAdmin ? Icons.admin_panel_settings : _getTipoIcon(n.tipo);
 
     return GestureDetector(
       onTap: () => _mostrarDetalles(context, n),
@@ -154,23 +158,23 @@ class NotificacionesPanelV2 extends StatelessWidget {
         margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
         padding: EdgeInsets.all(12.r),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: n.leida ? AppColors.white : AppColors.primary.withOpacity(0.03),
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-            color: n.leida ? AppColors.slate200 : Colors.transparent,
+            color: n.leida ? AppColors.slate200 : AppColors.primary.withOpacity(0.2),
           ),
           boxShadow: n.leida
               ? null
               : [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: AppColors.primary.withOpacity(0.05),
               blurRadius: 8.r,
               offset: Offset(0, 2.h),
             ),
           ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center, // Centrado verticalmente
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 36.r,
@@ -225,15 +229,15 @@ class NotificacionesPanelV2 extends StatelessWidget {
               GestureDetector(
                 onTap: () => provider.marcarLeida(n.id),
                 child: Container(
-                  padding: EdgeInsets.all(8.r), // Aumentado padding
+                  padding: EdgeInsets.all(8.r),
                   margin: EdgeInsets.only(left: 8.w),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.check, // Cambiado a check simple
-                    size: 30.r, // Aumentado tamaño (era 20, +50% ≈ 30, dejado en 26 por estética)
+                    Icons.check,
+                    size: 20.r,
                     color: AppColors.primary,
                   ),
                 ),
@@ -247,8 +251,8 @@ class NotificacionesPanelV2 extends StatelessWidget {
   String _calcularTiempo(DateTime timestamp) {
     final diff = DateTime.now().difference(timestamp);
     if (diff.inMinutes < 60) return '${diff.inMinutes} min';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
+    if (diff.inHours < 24) return '${diff.inHours} h';
+    return '${diff.inDays} d';
   }
 
   Color _getTipoColor(String tipo) {
@@ -329,12 +333,12 @@ class NotificacionesPanelV2 extends StatelessWidget {
                     width: 40.r,
                     height: 40.r,
                     decoration: BoxDecoration(
-                      color: _getTipoColor(n.tipo).withOpacity(0.12),
+                      color: (n.esAdmin ? AppColors.primary : _getTipoColor(n.tipo)).withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _getTipoIcon(n.tipo),
-                      color: _getTipoColor(n.tipo),
+                      n.esAdmin ? Icons.admin_panel_settings : _getTipoIcon(n.tipo),
+                      color: n.esAdmin ? AppColors.primary : _getTipoColor(n.tipo),
                       size: 20.r,
                     ),
                   ),
@@ -344,7 +348,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Detalle de Alerta',
+                          n.esAdmin ? 'Instrucción de Admin' : 'Detalle de Alerta',
                           style: TextStyle(
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w800,
@@ -355,7 +359,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                           n.tipo.toUpperCase(),
                           style: TextStyle(
                             fontSize: 12.sp,
-                            color: _getTipoColor(n.tipo),
+                            color: n.esAdmin ? AppColors.primary : _getTipoColor(n.tipo),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -409,7 +413,7 @@ class NotificacionesPanelV2 extends StatelessWidget {
                         ),
                         SizedBox(width: 4.w),
                         Text(
-                          'Hace ${_calcularTiempo(n.timestamp)}',
+                          'Enviado ${_calcularTiempo(n.timestamp)}',
                           style: TextStyle(
                             fontSize: 12.sp,
                             color: AppColors.slate400,

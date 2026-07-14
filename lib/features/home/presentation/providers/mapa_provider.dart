@@ -12,6 +12,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 // Imports absolutos a tu propia feature
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
+import 'package:saferoute_app/features/home/domain/entities/destino_reciente_entity.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {
@@ -25,7 +26,14 @@ class MapaProvider extends ChangeNotifier {
 
   MapaProvider(this.homeRepository, this._dotenv);
 
-  set token(String nuevoToken) => _token = nuevoToken;
+  set token(String nuevoToken) {
+    if (_token != nuevoToken) {
+      _token = nuevoToken;
+      if (_token.isNotEmpty) {
+        cargarDestinosRecientes();
+      }
+    }
+  }
   set userId(String id) => _userId = id;
 
   LatLng _ubicacionActual = const LatLng(16.753, -93.115);
@@ -55,6 +63,10 @@ class MapaProvider extends ChangeNotifier {
   WebSocketChannel? _socket;
   Timer? _telemetriaTimer;
   
+  // --- Historial de Destinos ---
+  List<DestinoReciente> _destinosRecientes = [];
+  bool _cargandoDestinos = false;
+
   // Getters
   LatLng get ubicacionActual => _ubicacionActual;
   List<RutaEntity> get rutas => _rutas;
@@ -76,6 +88,9 @@ class MapaProvider extends ChangeNotifier {
   bool get viajeCargando => _viajeCargando;
   bool get desviado => _desviado;
   String? get viajeId => _viajeId;
+
+  List<DestinoReciente> get destinosRecientes => _destinosRecientes;
+  bool get cargandoDestinos => _cargandoDestinos;
 
   void guardarTextosBusqueda({String? origen, String? destino, bool? usarUbicacion}) {
     if (origen != null) _textoOrigen = origen;
@@ -230,7 +245,7 @@ class MapaProvider extends ChangeNotifier {
         origenLon: _origenBusqueda!.longitude,
         destinoLat: _destinoBusqueda!.latitude,
         destinoLon: _destinoBusqueda!.longitude,
-        polylineRuta: _rutaSeleccionada!.polyline, // <--- CAMBIO: Ahora usamos .polyline en vez de .id
+        polylineRuta: _rutaSeleccionada!.polyline,
         rutaId: _rutaSeleccionada!.nombre,
         token: _token,
       );
@@ -238,6 +253,19 @@ class MapaProvider extends ChangeNotifier {
       _viajeId = id;
       _enViaje = true;
       await _storage.write(key: 'viaje_id_activo', value: id);
+
+      // Guardar en el historial de la API
+      try {
+        await homeRepository.guardarDestinoReciente(
+          nombre: _textoDestino,
+          lat: _destinoBusqueda!.latitude,
+          lon: _destinoBusqueda!.longitude,
+          token: _token,
+        );
+        cargarDestinosRecientes(); // Refrescar lista
+      } catch (e) {
+        debugPrint("Error guardando destino en API: $e");
+      }
 
       _conectarWebSocket();
 
@@ -353,6 +381,32 @@ class MapaProvider extends ChangeNotifier {
       _destinoBusqueda!.latitude,
       _destinoBusqueda!.longitude,
     );
+  }
+
+  // --- DESTINOS RECIENTES ---
+  
+  Future<void> cargarDestinosRecientes() async {
+    if (_token.isEmpty) return;
+    _cargandoDestinos = true;
+    notifyListeners();
+    try {
+      _destinosRecientes = await homeRepository.getDestinosRecientes(_token);
+    } catch (e) {
+      debugPrint("Error cargando destinos recientes: $e");
+    } finally {
+      _cargandoDestinos = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> eliminarDestinoReciente(String id) async {
+    try {
+      await homeRepository.eliminarDestinoReciente(id, _token);
+      _destinosRecientes.removeWhere((d) => d.id == id);
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error eliminando destino: $e");
+    }
   }
 
   @override

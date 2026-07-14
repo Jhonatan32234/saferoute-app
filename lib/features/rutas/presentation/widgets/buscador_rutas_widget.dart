@@ -1,11 +1,10 @@
-// lib/presentation/widgets/buscador_rutas_widget.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../../../core/theme/app_colors.dart';  // ✅ Solo importar de aquí
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants.dart';
 import '../../../home/presentation/providers/mapa_provider.dart';
 
@@ -40,6 +39,11 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
     _origenController.addListener(() => _onSearchChanged(esOrigen: true));
     _destinoController.addListener(() => _onSearchChanged(esOrigen: false));
+
+    // Cargar destinos recientes al abrir el buscador
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      mapaProvider.cargarDestinosRecientes();
+    });
   }
 
   void _persistirCambios() {
@@ -181,6 +185,8 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final mapaProvider = context.watch<MapaProvider>();
+
     return Container(
       padding: EdgeInsets.only(
         left: 20.w,
@@ -326,7 +332,54 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
               ),
             ),
 
-            // Sugerencias
+            // --- SECCIÓN DE DESTINOS RECIENTES ---
+            if (mapaProvider.destinosRecientes.isNotEmpty) ...[
+              SizedBox(height: 16.h),
+              Text(
+                'Destinos Recientes',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              SizedBox(
+                height: 40.h,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: mapaProvider.destinosRecientes.length,
+                  itemBuilder: (context, index) {
+                    final destino = mapaProvider.destinosRecientes[index];
+                    return Padding(
+                      padding: EdgeInsets.only(right: 8.w),
+                      child: ActionChip(
+                        avatar: Icon(Icons.history, size: 14.r, color: AppColors.primary),
+                        label: Text(
+                          destino.nombre,
+                          style: TextStyle(fontSize: 12.sp, color: AppColors.slate700),
+                        ),
+                        backgroundColor: AppColors.slate50,
+                        side: BorderSide(color: AppColors.slate200),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+                        onPressed: () {
+                          _destinoController.text = destino.nombre;
+                          mapaProvider.actualizarPuntoBusqueda(
+                            lat: destino.lat,
+                            lon: destino.lon,
+                            esOrigen: false,
+                          );
+                          _buscarRutaFinal();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            // Sugerencias Nominatim
             if (_sugerencias.isNotEmpty)
               Padding(
                 padding: EdgeInsets.only(top: 8.h),

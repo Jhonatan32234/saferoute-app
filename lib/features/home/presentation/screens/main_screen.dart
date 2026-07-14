@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -121,7 +122,6 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() => _puntoEnfocado = null);
 
-      // SOLUCIÓN: Usar sintaxis de punto para el nombre
       final String nombreRuta = mapaProvider.rutaSeleccionada!.nombre;
 
       final index = mapaProvider.rutas.indexOf(mapaProvider.rutaSeleccionada!);
@@ -148,27 +148,102 @@ class _MainScreenState extends State<MainScreen> {
           });
         }
 
-        if (zonas.length > 30) {
-          final zonasFiltradas = <Map<String, dynamic>>[];
-          final stepFiltro = (zonas.length / 30).ceil();
-          for (int i = 0; i < zonas.length; i += stepFiltro) {
-            zonasFiltradas.add(zonas[i]);
-          }
-          if (zonasFiltradas.isNotEmpty &&
-              zonasFiltradas.last['zona_nombre'] != zonas.last['zona_nombre']) {
-            zonasFiltradas.add(zonas.last);
-          }
-          notiProvider.escucharRuta(idActual);
-        } else {
-          notiProvider.escucharRuta(idActual);
-        }
+        notiProvider.escucharRuta(idActual);
       }
     } else {
       notiProvider.desconectarRuta();
     }
   }
 
-  void _onNotificacionActualizada() {}
+  void _onNotificacionActualizada() {
+    if (!mounted) return;
+    final noti = _notiProvider;
+    if (noti.ultimaAlertaUrgente != null) {
+      final alerta = noti.ultimaAlertaUrgente!;
+      noti.limpiarAlertaUrgente(); // Evitar bucles
+      _mostrarAlertaAdminUrgente(alerta);
+    }
+  }
+
+  void _mostrarAlertaAdminUrgente(NotificacionEntity alerta) {
+    HapticFeedback.heavyImpact();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.primary,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        title: Row(
+          children: [
+            Icon(Icons.admin_panel_settings, color: Colors.white, size: 28.r),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                'INSTRUCCIÓN DE CONTROL',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16.sp,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              alerta.mensaje,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Container(
+              padding: EdgeInsets.all(8.r),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.white, size: 16),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      'Esta es una instrucción directa del administrador.',
+                      style: TextStyle(color: Colors.white70, fontSize: 11.sp),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+            ),
+            child: Text(
+              'ENTENDIDO',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.sp),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _inicializar() async {
     final mapaProvider = _mapaProvider;
@@ -212,7 +287,6 @@ class _MainScreenState extends State<MainScreen> {
   void _inicializarZonaUbicacion() {
     if (!mounted) return;
     final mapaProvider = _mapaProvider;
-    final notiProvider = _notiProvider;
     if (!mapaProvider.zonaInicializada) {
       mapaProvider.actualizarZonaUbicacion();
     }
@@ -380,6 +454,16 @@ class _MainScreenState extends State<MainScreen> {
           SizedBox(width: 8.w),
           GestureDetector(
             onTap: () async {
+              if (mapaProvider.enViaje) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Finaliza el viaje activo antes de cerrar sesión'),
+                    backgroundColor: AppColors.danger,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
               await auth.logout();
             },
             child: Container(
@@ -393,7 +477,7 @@ class _MainScreenState extends State<MainScreen> {
               child: Icon(
                 Icons.logout,
                 size: 18.r,
-                color: AppColors.slate700,
+                color: mapaProvider.enViaje ? AppColors.slate300 : AppColors.slate700,
               ),
             ),
           ),
@@ -628,7 +712,6 @@ class _MainScreenState extends State<MainScreen> {
     final reporteProvider = context.read<ReporteProvider>();
     final mapaProvider = context.read<MapaProvider>();
 
-    // SOLUCIÓN: Usar sintaxis de punto
     final rutaId = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
 
     reporteProvider.enviarReporte(
@@ -648,7 +731,6 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[index],
           strokeWidth: 5,
-          // SOLUCIÓN: Usar sintaxis de punto
           color: _colorRuta(mapaProvider.rutaSeleccionada!.seguridad),
         ));
       }
@@ -658,7 +740,6 @@ class _MainScreenState extends State<MainScreen> {
         polylines.add(Polyline(
           points: mapaProvider.polilineas[i],
           strokeWidth: 4,
-          // SOLUCIÓN: Usar sintaxis de punto
           color: _colorRuta(r.seguridad).withOpacity(0.8),
         ));
       }
