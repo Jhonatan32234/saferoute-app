@@ -62,6 +62,7 @@ class MapaProvider extends ChangeNotifier {
   bool _desviado = false;
   WebSocketChannel? _socket;
   Timer? _telemetriaTimer;
+  Timer? _telemetriaNotiTimer;
   
   // --- Historial de Destinos ---
   List<DestinoReciente> _destinosRecientes = [];

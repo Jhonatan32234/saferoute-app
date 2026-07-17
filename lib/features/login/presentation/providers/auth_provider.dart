@@ -15,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
   bool _inicializado = false;
   String? _error;
   DateTime? _ultimaActividad;
+  bool _isOnline = true;
 
   String? get token => _token;
   String? get nombre => _nombre;
@@ -23,9 +24,18 @@ class AuthProvider extends ChangeNotifier {
   bool get inicializado => _inicializado;
   bool get isLoggedIn => _token != null && _token!.isNotEmpty && !sesionExpirada;
   String? get error => _error;
+  bool get isOnline => _isOnline;
 
   AuthProvider(this.authRepository) {
     _cargarSesion();
+    _monitorearConectividad();
+  }
+
+  void _monitorearConectividad() {
+    Connectivity().onConnectivityChanged.listen((result) {
+      _isOnline = !result.contains(ConnectivityResult.none);
+      notifyListeners();
+    });
   }
 
   void actualizarActividad() {

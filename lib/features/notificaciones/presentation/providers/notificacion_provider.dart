@@ -146,8 +146,8 @@ class NotificacionProvider extends ChangeNotifier {
     if (data['tipo'] == 'ping' || data['tipo'] == 'pong') return;
     
     if (data['tipo'] == 'telemetria_ack') {
-      _alertasMapa = [];
-      notifyListeners();
+      // No limpiar alertas aquí para evitar que los iconos desaparezcan parpadeando
+      // El servidor enviará 'alerta_proximidad' si hay nuevas o actualizaciones
       return;
     }
 
@@ -170,6 +170,13 @@ class NotificacionProvider extends ChangeNotifier {
 
     // Para cualquier otro mensaje importante, refrescamos.
     cargarHistorial();
+  }
+
+  void agregarAlertaLocal(NotificacionEntity alerta) {
+    if (!_alertasMapa.any((n) => n.id == alerta.id)) {
+      _alertasMapa.add(alerta);
+      notifyListeners();
+    }
   }
 
   void _intentarReconexion(String rutaId) {

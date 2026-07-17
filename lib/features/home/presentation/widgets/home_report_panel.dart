@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../../../notificaciones/domain/entities/notificacion_entity.dart';
+import '../../../notificaciones/presentation/providers/notificacion_provider.dart';
 import '../../../reportes/presentation/providers/reporte_provider.dart';
 import '../../../reportes/presentation/widgets/report_button_widget.dart';
 import '../providers/mapa_provider.dart';
@@ -33,19 +35,43 @@ class HomeReportPanel extends StatelessWidget {
     );
   }
 
-  void _enviarReporte(BuildContext context, String tipo, String notaVoz) {
+  void _enviarReporte(BuildContext context, String tipo, String notaVoz) async {
     final reporteProvider = context.read<ReporteProvider>();
     final mapaProvider = context.read<MapaProvider>();
+    final notiProvider = context.read<NotificacionProvider>();
 
+    final lat = mapaProvider.ubicacionActual.latitude;
+    final lon = mapaProvider.ubicacionActual.longitude;
     final rutaId = mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
 
-    reporteProvider.enviarReporte(
+    // 1. Enviar al servidor
+    await reporteProvider.enviarReporte(
       tipo: tipo,
-      latitud: mapaProvider.ubicacionActual.latitude,
-      longitud: mapaProvider.ubicacionActual.longitude,
+      latitud: lat,
+      longitud: lon,
       notaVoz: notaVoz,
       rutaId: rutaId,
     );
+
+    // 2. Si fue exitoso, agregarlo visualmente de inmediato
+    if (reporteProvider.ultimoResultado == 'éxito') {
+      final reportId = DateTime.now().millisecondsSinceEpoch.toString();
+      notiProvider.agregarAlertaLocal(
+        NotificacionEntity(
+          id: reportId,
+          reporteId: reportId,
+          mensaje: 'Reportaste: $tipo',
+          tipo: tipo,
+          latitud: lat,
+          longitud: lon,
+          timestamp: DateTime.now(),
+          leida: true,
+          esAdmin: false,
+          notaVoz: notaVoz,
+          rutaId: rutaId,
+        ),
+      );
+    }
   }
 }
 

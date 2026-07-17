@@ -393,9 +393,13 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
 
           SizedBox(height: 12.h),
           GestureDetector(
-            onLongPress: _startRecording,
-            onLongPressUp: _stopRecording,
-            onLongPressCancel: _stopRecording,
+            onTap: () {
+              if (_recording) {
+                _stopRecording();
+              } else {
+                _startRecording();
+              }
+            },
             child: AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
@@ -409,18 +413,25 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                           : [theme.colorScheme.primary, theme.colorScheme.secondary],
                     ),
                     borderRadius: BorderRadius.circular(16.r),
+                    boxShadow: _recording ? [
+                      BoxShadow(
+                        color: theme.colorScheme.error.withOpacity(0.3 * _pulseController.value),
+                        blurRadius: 12.r,
+                        spreadRadius: 4.r,
+                      )
+                    ] : null,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.mic,
+                        _recording ? Icons.stop : Icons.mic,
                         color: Colors.white,
                         size: 20.r,
                       ),
                       SizedBox(width: 8.w),
                       Text(
-                        _recording ? 'Grabando... Suelta para enviar' : 'Mantén presionado para hablar',
+                        _recording ? 'Detener y enviar' : 'Clic para grabar audio',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
