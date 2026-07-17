@@ -1,4 +1,3 @@
-// lib/presentation/widgets/report_button_widget.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -27,12 +26,10 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   int _timer = 0;
   late AnimationController _pulseController;
 
-  // STT fields
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _speechEnabled = false;
   String _words = '';
 
-  // Usar los tipos del mapper
   final List<Map<String, dynamic>> incidentTypes = ReporteMapper.tiposUI;
 
   @override
@@ -110,7 +107,6 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
       );
     }
 
-    // Simular timer
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!_recording || !mounted) return false;
@@ -126,15 +122,11 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
     setState(() => _recording = false);
 
     if (_timer >= 1 && _selectedType != null) {
-      // ✅ Convertir el tipo UI a tipo Backend (español)
       final tipoBackend = ReporteMapper.uiToBackend(_selectedType!);
-      
-      // ✅ Usar el texto transcrito o un mensaje descriptivo si falló
       final notaParaEnviar = _words.trim().isNotEmpty 
           ? _words.trim() 
           : 'Reporte de ${_selectedType!.toLowerCase()}';
 
-      print('📤 [REPORTE] Enviando tipo: $tipoBackend (UI: $_selectedType) con nota: $notaParaEnviar'); 
       widget.onReporteEnviado(tipoBackend, notaParaEnviar);
       
       setState(() => _state = ReportState.sent);
@@ -174,25 +166,25 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   }
 
   Widget _buildIdleButton() {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => setState(() => _state = ReportState.selecting),
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 16.h),
         decoration: BoxDecoration(
-          color: AppColors.danger,
+          color: theme.colorScheme.error,
           borderRadius: BorderRadius.circular(16.r),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.white, size: 20.r),
+            Icon(Icons.warning_amber_rounded, color: theme.colorScheme.onError, size: 20.r),
             SizedBox(width: 8.w),
             Text(
               'Reportar incidente',
-              style: TextStyle(
-                color: AppColors.white,
-                fontSize: 16.sp,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onError,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -203,15 +195,16 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   }
 
   Widget _buildTypeSelector() {
+    final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.all(12.r),
       decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.95),
+        color: theme.colorScheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: theme.shadowColor.withOpacity(0.08),
             blurRadius: 24.r,
           ),
         ],
@@ -223,11 +216,10 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
             padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
             child: Text(
               'SELECCIONA EL TIPO',
-              style: TextStyle(
-                fontSize: 10.sp,
+              style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: AppColors.slate400,
+                color: theme.hintColor,
               ),
             ),
           ),
@@ -270,15 +262,14 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                           ),
                           child: Icon(
                             _getIconFromName(type['icon'] as String),
-                            color: AppColors.white,
+                            color: Colors.white,
                             size: 16.r,
                           ),
                         ),
                         SizedBox(height: 4.h),
                         Text(
                           type['label'] as String,
-                          style: TextStyle(
-                            fontSize: 9.sp,
+                          style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: color,
                           ),
@@ -299,16 +290,15 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
               width: double.infinity,
               padding: EdgeInsets.symmetric(vertical: 10.h),
               decoration: BoxDecoration(
-                color: AppColors.slate100,
+                color: theme.colorScheme.surfaceVariant,
                 borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.slate200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Center(
                 child: Text(
                   'Cancelar',
-                  style: TextStyle(
-                    color: AppColors.slate600,
-                    fontSize: 13.sp,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -321,6 +311,7 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   }
 
   Widget _buildRecordingButton() {
+    final theme = Theme.of(context);
     final selectedTypeData = incidentTypes.firstWhere(
           (t) => t['tipo'] == _selectedType,
       orElse: () => incidentTypes.first,
@@ -330,12 +321,12 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.95),
+        color: theme.colorScheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: theme.shadowColor.withOpacity(0.08),
             blurRadius: 24.r,
           ),
         ],
@@ -353,15 +344,14 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                 ),
                 child: Icon(
                   _getIconFromName(selectedTypeData['icon'] as String),
-                  color: AppColors.white,
+                  color: Colors.white,
                   size: 16.r,
                 ),
               ),
               SizedBox(width: 8.w),
               Text(
                 selectedTypeData['label'] as String,
-                style: TextStyle(
-                  fontSize: 14.sp,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: color,
                 ),
@@ -369,33 +359,29 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
               if (_recording) ...[
                 const Spacer(),
                 Text(
-                  '${_timer}s',
-                  style: TextStyle(
-                    fontSize: 14.sp,
+                  '$_timer s',
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.danger,
+                    color: theme.colorScheme.error,
                   ),
                 ),
               ],
             ],
           ),
           
-          // ✅ Mostrar transcripción en tiempo real
           if (_recording && _words.isNotEmpty) ...[
             SizedBox(height: 12.h),
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                color: AppColors.slate50,
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.slate200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Text(
                 _words,
-                style: TextStyle(
-                  fontSize: 13.sp,
-                  color: AppColors.slate700,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontStyle: FontStyle.italic,
                 ),
                 textAlign: TextAlign.center,
@@ -419,8 +405,8 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: _recording
-                          ? [AppColors.danger, AppColors.danger.withOpacity(0.8)]
-                          : [AppColors.primary, AppColors.primaryLight],
+                          ? [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.8)]
+                          : [theme.colorScheme.primary, theme.colorScheme.secondary],
                     ),
                     borderRadius: BorderRadius.circular(16.r),
                   ),
@@ -429,15 +415,14 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                     children: [
                       Icon(
                         Icons.mic,
-                        color: AppColors.white,
+                        color: Colors.white,
                         size: 20.r,
                       ),
                       SizedBox(width: 8.w),
                       Text(
                         _recording ? 'Grabando... Suelta para enviar' : 'Mantén presionado para hablar',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 14.sp,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -460,16 +445,15 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
               width: double.infinity,
               padding: EdgeInsets.symmetric(vertical: 10.h),
               decoration: BoxDecoration(
-                color: AppColors.slate100,
+                color: theme.colorScheme.surfaceVariant,
                 borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.slate200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Center(
                 child: Text(
                   'Cancelar',
-                  style: TextStyle(
-                    color: AppColors.slate600,
-                    fontSize: 13.sp,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -482,6 +466,7 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   }
 
   Widget _buildSentConfirmation() {
+    final theme = Theme.of(context);
     final selectedTypeData = incidentTypes.firstWhere(
           (t) => t['tipo'] == _selectedType,
       orElse: () => incidentTypes.first,
@@ -490,12 +475,12 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.95),
+        color: theme.colorScheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: theme.shadowColor.withOpacity(0.08),
             blurRadius: 24.r,
           ),
         ],
@@ -505,7 +490,7 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
           Container(
             width: 40.r,
             height: 40.r,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.successBg,
               shape: BoxShape.circle,
             ),
@@ -518,19 +503,16 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
               children: [
                 Text(
                   '¡Reporte enviado!',
-                  style: TextStyle(
-                    fontSize: 14.sp,
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.slate800,
                   ),
                 ),
                 Text(
                   _words.isNotEmpty 
                       ? _words 
-                      : '${selectedTypeData['label']} · Enviado correctamente',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppColors.slate500,
+                      : "${selectedTypeData['label']} · Enviado correctamente",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

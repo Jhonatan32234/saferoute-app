@@ -40,7 +40,6 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
     _origenController.addListener(() => _onSearchChanged(esOrigen: true));
     _destinoController.addListener(() => _onSearchChanged(esOrigen: false));
 
-    // Cargar destinos recientes al abrir el buscador
     WidgetsBinding.instance.addPostFrameCallback((_) {
       mapaProvider.cargarDestinosRecientes();
     });
@@ -185,6 +184,7 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final mapaProvider = context.watch<MapaProvider>();
 
     return Container(
@@ -195,11 +195,11 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
       ),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: theme.shadowColor.withOpacity(0.08),
             blurRadius: 32.r,
             offset: Offset(0, -8.h),
           ),
@@ -216,10 +216,8 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
               children: [
                 Text(
                   'Planificar Viaje',
-                  style: TextStyle(
-                    fontSize: 18.sp,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.slate800,
                   ),
                 ),
                 const Spacer(),
@@ -229,13 +227,13 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                     width: 32.r,
                     height: 32.r,
                     decoration: BoxDecoration(
-                      color: AppColors.slate100,
+                      color: theme.colorScheme.surfaceVariant,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.close,
                       size: 16.r,
-                      color: AppColors.slate600,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -245,28 +243,21 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
             // Origen
             if (!_usarUbicacionActual)
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(color: AppColors.slate200),
-                ),
+              _buildInputContainer(
                 child: TextField(
                   controller: _origenController,
-                  style: TextStyle(fontSize: 14.sp, color: AppColors.slate800),
+                  style: theme.textTheme.bodyMedium,
                   decoration: InputDecoration(
                     labelText: 'Origen',
-                    labelStyle: TextStyle(fontSize: 14.sp, color: AppColors.slate600),
                     prefixIcon: Icon(Icons.trip_origin, color: AppColors.success, size: 20.r),
                     suffixIcon: IconButton(
-                      icon: Icon(Icons.my_location, size: 20.r, color: AppColors.primary),
+                      icon: Icon(Icons.my_location, size: 20.r, color: theme.colorScheme.primary),
                       onPressed: () {
                         setState(() => _usarUbicacionActual = true);
                         _persistirCambios();
                       },
                     ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   ),
                 ),
               )
@@ -274,21 +265,20 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryBg,
+                  color: theme.colorScheme.primary.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(color: AppColors.primaryBorder),
+                  border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.my_location, color: AppColors.primary, size: 20.r),
+                    Icon(Icons.my_location, color: theme.colorScheme.primary, size: 20.r),
                     SizedBox(width: 12.w),
                     Expanded(
                       child: Text(
                         'Desde mi ubicación actual',
-                        style: TextStyle(
-                          color: AppColors.primary,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
                         ),
                       ),
                     ),
@@ -299,10 +289,9 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                       },
                       child: Text(
                         'Cambiar',
-                        style: TextStyle(
-                          fontSize: 14.sp,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
                     ),
@@ -313,21 +302,14 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
             SizedBox(height: 12.h),
 
             // Destino
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(color: AppColors.slate200),
-              ),
+            _buildInputContainer(
               child: TextField(
                 controller: _destinoController,
-                style: TextStyle(fontSize: 14.sp, color: AppColors.slate800),
+                style: theme.textTheme.bodyMedium,
                 decoration: InputDecoration(
                   labelText: '¿A dónde vas?',
-                  labelStyle: TextStyle(fontSize: 14.sp, color: AppColors.slate600),
-                  prefixIcon: Icon(Icons.location_on, color: AppColors.danger, size: 20.r),
+                  prefixIcon: Icon(Icons.location_on, color: theme.colorScheme.error, size: 20.r),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 ),
               ),
             ),
@@ -337,10 +319,9 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
               SizedBox(height: 16.h),
               Text(
                 'Destinos Recientes',
-                style: TextStyle(
-                  fontSize: 12.sp,
+                style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.slate500,
+                  color: theme.hintColor,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -355,13 +336,13 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                     return Padding(
                       padding: EdgeInsets.only(right: 8.w),
                       child: ActionChip(
-                        avatar: Icon(Icons.history, size: 14.r, color: AppColors.primary),
+                        avatar: Icon(Icons.history, size: 14.r, color: theme.colorScheme.primary),
                         label: Text(
                           destino.nombre,
-                          style: TextStyle(fontSize: 12.sp, color: AppColors.slate700),
+                          style: theme.textTheme.bodySmall,
                         ),
-                        backgroundColor: AppColors.slate50,
-                        side: BorderSide(color: AppColors.slate200),
+                        backgroundColor: theme.colorScheme.surface,
+                        side: BorderSide(color: theme.dividerColor),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
                         onPressed: () {
                           _destinoController.text = destino.nombre;
@@ -395,9 +376,9 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                         child: ActionChip(
                           label: Text(
                             sug,
-                            style: TextStyle(fontSize: 11.sp, color: AppColors.slate700),
+                            style: theme.textTheme.bodySmall,
                           ),
-                          backgroundColor: AppColors.slate100,
+                          backgroundColor: theme.colorScheme.surfaceVariant,
                           padding: EdgeInsets.zero,
                           onPressed: () {
                             _destinoController.text = sug;
@@ -417,7 +398,7 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                 padding: EdgeInsets.only(top: 8.h),
                 child: Text(
                   _error!,
-                  style: TextStyle(color: AppColors.danger, fontSize: 12.sp),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                 ),
               ),
 
@@ -429,11 +410,11 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
               child: Container(
                 height: 50.h,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: theme.colorScheme.primary,
                   borderRadius: BorderRadius.circular(16.r),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: theme.colorScheme.primary.withOpacity(0.3),
                       blurRadius: 16.r,
                     ),
                   ],
@@ -443,22 +424,21 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                       ? SizedBox(
                     width: 20.r,
                     height: 20.r,
-                    child: const CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   )
                       : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.map, color: AppColors.white, size: 20.r),
+                      Icon(Icons.map, color: theme.colorScheme.onPrimary, size: 20.r),
                       SizedBox(width: 8.w),
                       Text(
                         'Ver Rutas Seguras',
-                        style: TextStyle(
-                          fontSize: 14.sp,
+                        style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
-                          color: AppColors.white,
+                          color: theme.colorScheme.onPrimary,
                         ),
                       ),
                     ],
@@ -469,6 +449,18 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInputContainer({required Widget child}) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: child,
     );
   }
 }

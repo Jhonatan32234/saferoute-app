@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:saferoute_app/core/theme/app_colors.dart';
 
 class RutaCard extends StatelessWidget {
   final String nombre;
@@ -23,24 +24,25 @@ class RutaCard extends StatelessWidget {
 
   Color get _color {
     switch (seguridad) {
-      case 'verde': return Colors.green;
-      case 'amarillo': return Colors.orange;
-      case 'rojo': return Colors.red;
-      default: return Colors.grey;
+      case 'verde': return AppColors.success;
+      case 'amarillo': return AppColors.warning;
+      case 'rojo': return AppColors.danger;
+      default: return AppColors.slate400;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: EdgeInsets.only(bottom: 6.h),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8.r),
         border: Border.all(color: _color.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: theme.shadowColor.withOpacity(0.05),
             blurRadius: 4.r,
             offset: Offset(0, 2.h),
           )
@@ -62,13 +64,13 @@ class RutaCard extends StatelessWidget {
                     children: [
                       Text(
                         nombre,
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '${distanciaKm.toStringAsFixed(1)} km · ${tiempoMinutos} min',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 11.sp),
+                        '${distanciaKm.toStringAsFixed(1)} km · $tiempoMinutos min',
+                        style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
                       ),
                     ],
                   ),
@@ -87,7 +89,7 @@ class RutaCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.r)),
                     ),
-                    child: Text('Ir', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold)),
+                    child: Text('Ir', style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
               ),

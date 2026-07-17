@@ -10,10 +10,11 @@ class RutaPillWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final mapaProvider = context.watch<MapaProvider>();
 
     if (mapaProvider.cargandoRutas || mapaProvider.viajeCargando) {
-      return _buildLoading(mapaProvider.viajeCargando ? 'Iniciando viaje...' : 'Calculando rutas...');
+      return _buildLoading(context, mapaProvider.viajeCargando ? 'Iniciando viaje...' : 'Calculando rutas...');
     }
 
     if (mapaProvider.enViaje) {
@@ -24,7 +25,7 @@ class RutaPillWidget extends StatelessWidget {
       final ruta = mapaProvider.rutaSeleccionada!;
       return Container(
         padding: EdgeInsets.all(12.r),
-        decoration: _pillDecoration(),
+        decoration: _pillDecoration(context),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -36,16 +37,19 @@ class RutaPillWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(ruta.nombre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                      Text(
+                        ruta.nombre, 
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                       Text(
                         '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12.sp),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, size: 22.r, color: Colors.grey),
+                  icon: Icon(Icons.close, size: 22.r),
                   onPressed: () => mapaProvider.mostrarTodasLasRutas(),
                 ),
               ],
@@ -56,13 +60,11 @@ class RutaPillWidget extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => mapaProvider.iniciarViaje(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(vertical: 12.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   elevation: 0,
                 ),
-                child: Text('Iniciar Viaje Seguro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                child: Text('Iniciar Viaje Seguro', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
               ),
             ),
           ],
@@ -74,17 +76,17 @@ class RutaPillWidget extends StatelessWidget {
       return Container(
         constraints: BoxConstraints(maxHeight: 300.h),
         padding: EdgeInsets.all(12.r),
-        decoration: _pillDecoration(),
+        decoration: _pillDecoration(context),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Text('Rutas encontradas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                Text('Rutas encontradas', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => mapaProvider.limpiarBusqueda(),
-                  child: Icon(Icons.close, size: 22.r, color: Colors.grey),
+                  child: Icon(Icons.close, size: 22.r, color: theme.hintColor),
                 ),
               ],
             ),
@@ -116,13 +118,14 @@ class RutaPillWidget extends StatelessWidget {
   }
 
   Widget _buildViajeActivo(BuildContext context, MapaProvider provider) {
+    final theme = Theme.of(context);
     final distanciaM = provider.calcularDistanciaAlDestino();
     final puedeFinalizarNormal = distanciaM <= 50;
 
     return Container(
       padding: EdgeInsets.all(12.r),
-      decoration: _pillDecoration().copyWith(
-        border: provider.desviado ? Border.all(color: AppColors.danger, width: 2.r) : null,
+      decoration: _pillDecoration(context).copyWith(
+        border: provider.desviado ? Border.all(color: theme.colorScheme.error, width: 2.r) : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -131,27 +134,27 @@ class RutaPillWidget extends StatelessWidget {
             Container(
               margin: EdgeInsets.only(bottom: 8.h),
               padding: EdgeInsets.symmetric(vertical: 4.h, horizontal: 8.w),
-              decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(6.r)),
+              decoration: BoxDecoration(color: theme.colorScheme.error, borderRadius: BorderRadius.circular(6.r)),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.white, size: 16.r),
+                  Icon(Icons.warning, color: theme.colorScheme.onError, size: 16.r),
                   SizedBox(width: 8.w),
-                  Text('DESVÍO DETECTADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.sp)),
+                  Text('DESVÍO DETECTADO', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onError, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
           Row(
             children: [
-              Icon(Icons.navigation, color: AppColors.primary, size: 24.r),
+              Icon(Icons.navigation, color: theme.colorScheme.primary, size: 24.r),
               SizedBox(width: 12.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('En trayecto a destino', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                    Text('En trayecto a destino', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                     Text(
                       distanciaM > 1000 ? '${(distanciaM / 1000).toStringAsFixed(1)} km restantes' : '${distanciaM.toInt()} metros restantes',
-                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12.sp),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -159,7 +162,7 @@ class RutaPillWidget extends StatelessWidget {
               ElevatedButton(
                 onPressed: () => _confirmarFinalizacion(context, provider, puedeFinalizarNormal),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: puedeFinalizarNormal ? AppColors.success : AppColors.danger,
+                  backgroundColor: puedeFinalizarNormal ? AppColors.success : theme.colorScheme.error,
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
@@ -234,16 +237,17 @@ class RutaPillWidget extends StatelessWidget {
     }
   }
 
-  Widget _buildLoading(String msg) {
+  Widget _buildLoading(BuildContext context, String msg) {
+    final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: _pillDecoration(),
+      decoration: _pillDecoration(context),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(width: 18.r, height: 18.r, child: const CircularProgressIndicator(strokeWidth: 2)),
           SizedBox(width: 12.w),
-          Text(msg, style: TextStyle(fontSize: 13.sp)),
+          Text(msg, style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -259,12 +263,13 @@ class RutaPillWidget extends StatelessWidget {
     );
   }
 
-  BoxDecoration _pillDecoration() {
+  BoxDecoration _pillDecoration(BuildContext context) {
+    final theme = Theme.of(context);
     return BoxDecoration(
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(16.r),
       boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15.r, offset: const Offset(0, 4)),
+        BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 15.r, offset: const Offset(0, 4)),
       ],
     );
   }

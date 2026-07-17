@@ -33,7 +33,8 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = color ?? Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final buttonColor = color ?? theme.colorScheme.primary;
     final minSize = Size(width?.w ?? 80.w, 48.h);
 
     if (isOutlined) {
@@ -44,10 +45,10 @@ class AppButton extends StatelessWidget {
           foregroundColor: buttonColor,
           side: BorderSide(color: buttonColor),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.r),
+            borderRadius: BorderRadius.circular(12.r),
           ),
         ),
-        child: _buildChild(buttonColor),
+        child: _buildChild(context, buttonColor),
       );
     }
 
@@ -55,23 +56,34 @@ class AppButton extends StatelessWidget {
       onPressed: isLoading ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: buttonColor,
+        foregroundColor: theme.colorScheme.onPrimary,
         minimumSize: minSize,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(12.r),
         ),
+        elevation: 0,
       ),
-      child: _buildChild(Colors.white),
+      child: _buildChild(context, theme.colorScheme.onPrimary),
     );
   }
 
-  Widget _buildChild(Color textColor) {
+  Widget _buildChild(BuildContext context, Color textColor) {
+    final theme = Theme.of(context);
     if (isLoading) {
       return SizedBox(
         height: 20.r,
         width: 20.r,
-        child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        child: CircularProgressIndicator(
+          strokeWidth: 2, 
+          color: textColor,
+        ),
       );
     }
+
+    final textStyle = theme.textTheme.labelLarge?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: textColor,
+    );
 
     if (icon != null) {
       return Row(
@@ -80,17 +92,11 @@ class AppButton extends StatelessWidget {
         children: [
           Icon(icon, size: 20.r, color: textColor),
           SizedBox(width: 8.w),
-          Text(
-            label,
-            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
-          ),
+          Text(label, style: textStyle),
         ],
       );
     }
 
-    return Text(
-      label,
-      style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
-    );
+    return Text(label, style: textStyle);
   }
 }
