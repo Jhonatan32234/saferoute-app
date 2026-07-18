@@ -349,15 +349,18 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
                 ),
               ),
               SizedBox(width: 8.w),
-              Text(
-                selectedTypeData['label'] as String,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: color,
+              Expanded(
+                child: Text(
+                  selectedTypeData['label'] as String,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (_recording) ...[
-                const Spacer(),
+                SizedBox(width: 8.w),
                 Text(
                   '$_timer s',
                   style: theme.textTheme.titleMedium?.copyWith(

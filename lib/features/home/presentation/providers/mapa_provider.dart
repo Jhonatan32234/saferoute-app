@@ -222,6 +222,7 @@ class MapaProvider extends ChangeNotifier {
   }
 
   void actualizarPuntoBusqueda({required double lat, required double lon, required bool esOrigen}) {
+    if (!lat.isFinite || !lon.isFinite) return;
     if (esOrigen) {
       _origenBusqueda = LatLng(lat, lon);
     } else {

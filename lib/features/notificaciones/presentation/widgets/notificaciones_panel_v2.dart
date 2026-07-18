@@ -252,29 +252,27 @@ class NotificacionesPanelV2 extends StatelessWidget {
   }
 
   Color _getTipoColor(String tipo) {
-    switch (tipo.toLowerCase()) {
-      case 'accident': case 'accidente': return AppColors.danger;
-      case 'flood': case 'inundacion': return AppColors.primary;
-      case 'pothole': case 'bache': return AppColors.warning;
-      case 'blockage': case 'bloqueo': return AppColors.purple;
-      case 'landslide': case 'derrumbe': return const Color(0xFFEA580C);
-      case 'fog': case 'niebla': return const Color(0xFF0EA5E9);
-      case 'nolight': case 'sin_luz': return const Color(0xFFEAB308);
-      default: return AppColors.slate500;
-    }
+    final t = tipo.toLowerCase();
+    if (t.contains('accident')) return AppColors.danger;
+    if (t.contains('inundacion') || t.contains('flood')) return AppColors.primary;
+    if (t.contains('bache') || t.contains('pothole')) return AppColors.warning;
+    if (t.contains('bloqueo') || t.contains('blockage')) return AppColors.purple;
+    if (t.contains('derrumbe') || t.contains('landslide')) return const Color(0xFFEA580C);
+    if (t.contains('niebla') || t.contains('fog')) return const Color(0xFF0EA5E9);
+    if (t.contains('luz') || t.contains('nolight')) return const Color(0xFFEAB308);
+    return AppColors.slate500;
   }
 
   IconData _getTipoIcon(String tipo) {
-    switch (tipo.toLowerCase()) {
-      case 'accident': case 'accidente': return Icons.car_crash;
-      case 'flood': case 'inundacion': return Icons.water_drop;
-      case 'pothole': case 'bache': return Icons.circle;
-      case 'blockage': case 'bloqueo': return Icons.block;
-      case 'landslide': case 'derrumbe': return Icons.landslide;
-      case 'fog': case 'niebla': return Icons.foggy;
-      case 'nolight': case 'sin_luz': return Icons.lightbulb_outline;
-      default: return Icons.notification_important;
-    }
+    final t = tipo.toLowerCase();
+    if (t.contains('accident')) return Icons.car_crash;
+    if (t.contains('inundacion') || t.contains('flood')) return Icons.water_drop;
+    if (t.contains('bache') || t.contains('pothole')) return Icons.circle;
+    if (t.contains('bloqueo') || t.contains('blockage')) return Icons.block;
+    if (t.contains('derrumbe') || t.contains('landslide')) return Icons.landslide;
+    if (t.contains('niebla') || t.contains('fog')) return Icons.foggy;
+    if (t.contains('luz') || t.contains('nolight')) return Icons.lightbulb_outline;
+    return Icons.notification_important;
   }
 
   void _mostrarDetalles(BuildContext context, NotificacionEntity n) {

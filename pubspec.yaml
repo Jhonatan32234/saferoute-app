@@ -20,7 +20,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
 
   # Mapas
-  flutter_map: ^8.0.0
+  mapbox_maps_flutter: ^2.6.0
   latlong2: ^0.9.1
 
   # Ubicación

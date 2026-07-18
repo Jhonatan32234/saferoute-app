@@ -20,24 +20,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _emailController = TextEditingController();
   final _telefonoController = TextEditingController();
   bool _isEditing = false;
+  late ProfileProvider _profileProvider;
 
   @override
   void initState() {
     super.initState();
-    final profileProvider = context.read<ProfileProvider>();
-    profileProvider.addListener(_onProfileUpdate);
+    _profileProvider = context.read<ProfileProvider>();
+    _profileProvider.addListener(_onProfileUpdate);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      profileProvider.cargarPerfil();
-      if (profileProvider.profile != null) {
-        _fillFields(profileProvider.profile!);
+      if (mounted) {
+        _profileProvider.cargarPerfil();
+        if (_profileProvider.profile != null) {
+          _fillFields(_profileProvider.profile!);
+        }
       }
     });
   }
 
   void _onProfileUpdate() {
     if (!mounted || _isEditing) return;
-    final profile = context.read<ProfileProvider>().profile;
+    final profile = _profileProvider.profile;
     if (profile != null) {
       _fillFields(profile);
     }
@@ -52,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    context.read<ProfileProvider>().removeListener(_onProfileUpdate);
+    _profileProvider.removeListener(_onProfileUpdate);
     _nombreController.dispose();
     _emailController.dispose();
     _telefonoController.dispose();
@@ -62,7 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleToggleEdit() {
     if (_isEditing) {
       if (_formKey.currentState!.validate()) {
-        context.read<ProfileProvider>().actualizarPerfil(
+        _profileProvider.actualizarPerfil(
           nombre: _nombreController.text,
           telefono: _telefonoController.text,
           email: _emailController.text,
