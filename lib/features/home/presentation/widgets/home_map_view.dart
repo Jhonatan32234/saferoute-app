@@ -150,15 +150,24 @@ class _HomeMapViewState extends State<HomeMapView> with SingleTickerProviderStat
     _dibujarMarcadores(mapaProvider, notiProvider);
   }
 
-  void _verificarRuta(MapaProvider provider, bool forzar) {
+  void _verificarRuta(MapaProvider provider, bool forzar) async {
     final currentId = provider.rutaSeleccionada?.id ?? "list-${provider.rutas.length}";
+    
+    // CASO 1: Si ya no hay polilineas (limpieza)
+    if (provider.polilineas.isEmpty) {
+      if (_lastRutaId != null) {
+        _lastRutaId = null;
+        await _polylineAnnotationManager?.deleteAll();
+      }
+      return;
+    }
+
+    // CASO 2: Cambio de ruta o carga inicial
     if (currentId != _lastRutaId || forzar) {
       _lastRutaId = currentId;
-      if (provider.polilineas.isNotEmpty) {
-        _routeAnimationController.reset();
-        _routeAnimationController.forward();
-        _ajustarCamaraARuta(provider);
-      }
+      _routeAnimationController.reset();
+      _routeAnimationController.forward();
+      _ajustarCamaraARuta(provider);
     }
   }
 
@@ -207,12 +216,18 @@ class _HomeMapViewState extends State<HomeMapView> with SingleTickerProviderStat
   void _dibujarMarcadores(MapaProvider mapa, NotificacionProvider noti) async {
     if (_pointAnnotationManager == null) return;
     
-    final totalMarkers = noti.alertasMapa.length + (mapa.origenBusqueda != null ? 1 : 0) + (mapa.destinoBusqueda != null ? 1 : 0);
-    if (totalMarkers == _lastMarkersCount) return;
-    _lastMarkersCount = totalMarkers;
+    // Limpieza total si ya no hay búsqueda ni alertas
+    if (noti.alertasMapa.isEmpty && mapa.origenBusqueda == null && mapa.destinoBusqueda == null) {
+      if (_lastMarkersCount != 0) {
+        _lastMarkersCount = 0;
+        await _pointAnnotationManager?.deleteAll();
+        _idToAlerta.clear();
+      }
+      return;
+    }
 
-    await _pointAnnotationManager?.deleteAll();
-    _idToAlerta.clear();
+    final totalMarkers = noti.alertasMapa.length + (mapa.origenBusqueda != null ? 1 : 0) + (mapa.destinoBusqueda != null ? 1 : 0);
+    if (totalMarkers == _lastMarkersCount && !mapa.enViaje) return; // Permitir actualización si el estado de viaje cambia
 
     for (var alerta in noti.alertasMapa) {
       final tipoId = _getTipoKey(alerta.tipo);
