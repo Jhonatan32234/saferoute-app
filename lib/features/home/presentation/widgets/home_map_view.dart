@@ -1,4 +1,6 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbm;
 import 'package:provider/provider.dart';
@@ -22,16 +24,15 @@ class HomeMapView extends StatefulWidget {
   });
 
   @override
-  State<HomeMapView> createState() => HomeMapViewState();
+  State<HomeMapView> createState() => _HomeMapViewState();
 }
 
-class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderStateMixin {
+class _HomeMapViewState extends State<HomeMapView> with SingleTickerProviderStateMixin {
   mbm.MapboxMap? _mapboxMap;
-  mbm.CircleAnnotationManager? _circleAnnotationManager;
+  mbm.PointAnnotationManager? _pointAnnotationManager;
   mbm.PolylineAnnotationManager? _polylineAnnotationManager;
 
   final String _styleUrl = "mapbox://styles/dev-saferoute/cmrpjagea00bt01qta2r53wkl";
-  
   final Map<String, NotificacionEntity> _idToAlerta = {};
   String? _lastRutaId;
   int _lastMarkersCount = 0;
@@ -48,8 +49,7 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..addListener(() {
-        // Optimización: Solo redibujar si el progreso cambió significativamente (evita el lag)
-        if ((_routeAnimationController.value - _lastAnimValue).abs() > 0.05) {
+        if ((_routeAnimationController.value - _lastAnimValue).abs() > 0.1) {
           _lastAnimValue = _routeAnimationController.value;
           _dibujarRutaActual();
         }
@@ -72,30 +72,80 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     _mapboxMap?.location.updateSettings(mbm.LocationComponentSettings(
       enabled: true,
       pulsingEnabled: true,
+      showAccuracyRing: true,
     ));
 
-    _circleAnnotationManager = await _mapboxMap?.annotations.createCircleAnnotationManager();
+    // Registro de iconos personalizados
+    await _registrarIconos();
+
+    _pointAnnotationManager = await _mapboxMap?.annotations.createPointAnnotationManager();
     _polylineAnnotationManager = await _mapboxMap?.annotations.createPolylineAnnotationManager();
 
-    _circleAnnotationManager?.addOnCircleAnnotationClickListener(
-      _OnCircleClickListener(onTap: (id) => _manejarClicMarcador(id)),
+    _pointAnnotationManager?.addOnPointAnnotationClickListener(
+      _OnPointClickListener(onTap: (id) => _manejarClicMarcador(id)),
     );
 
-    _actualizarMapa(forzar: true);
+    if (mounted) {
+      _actualizarMapa(forzar: true);
+    }
+  }
+
+  Future<void> _registrarIconos() async {
+    final iconos = [
+      {'id': 'accident', 'icon': Icons.car_crash, 'color': AppColors.danger},
+      {'id': 'flood', 'icon': Icons.water_drop, 'color': AppColors.primary},
+      {'id': 'pothole', 'icon': Icons.circle, 'color': AppColors.warning},
+      {'id': 'blockage', 'icon': Icons.block, 'color': AppColors.purple},
+      {'id': 'landslide', 'icon': Icons.landslide, 'color': const Color(0xFFEA580C)},
+      {'id': 'fog', 'icon': Icons.foggy, 'color': const Color(0xFF0EA5E9)},
+      {'id': 'nolight', 'icon': Icons.lightbulb_outline, 'color': const Color(0xFFEAB308)},
+    ];
+
+    for (var item in iconos) {
+      final bytes = await _generarImagenDeIcono(item['icon'] as IconData, item['color'] as Color);
+      await _mapboxMap?.style.addStyleImage(
+        item['id'] as String,
+        1.0,
+        mbm.MbxImage(width: 100, height: 100, data: bytes),
+        false, [], [], null
+      );
+    }
+  }
+
+  Future<Uint8List> _generarImagenDeIcono(IconData icon, Color color) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 100.0;
+    
+    final paint = Paint()..color = Colors.white;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2, paint);
+    
+    final borderPaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 6.0;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 3, borderPaint);
+
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(fontSize: 60.0, fontFamily: icon.fontFamily, color: color, package: icon.fontPackage),
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset((size - textPainter.width) / 2, (size - textPainter.height) / 2));
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
   }
 
   void _manejarClicMarcador(String id) {
     final alerta = _idToAlerta[id];
-    if (alerta != null) {
-      widget.onAlertTap(alerta);
-    }
+    if (alerta != null) widget.onAlertTap(alerta);
   }
 
   void _actualizarMapa({bool forzar = false}) {
     if (_mapboxMap == null) return;
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
-
     _verificarRuta(mapaProvider, forzar);
     _dibujarMarcadores(mapaProvider, notiProvider);
   }
@@ -108,8 +158,6 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
         _routeAnimationController.reset();
         _routeAnimationController.forward();
         _ajustarCamaraARuta(provider);
-      } else {
-        _polylineAnnotationManager?.deleteAll();
       }
     }
   }
@@ -121,7 +169,7 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     
     final camera = await _mapboxMap?.cameraForGeometry(
       lineString.toJson(), 
-      mbm.MbxEdgeInsets(top: 100, left: 60, bottom: 350, right: 60), 
+      mbm.MbxEdgeInsets(top: 100.0, left: 60.0, bottom: 350.0, right: 60.0), 
       null, null
     );
 
@@ -148,8 +196,8 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
         mbm.PolylineAnnotationOptions(
           geometry: mbm.LineString(coordinates: points.map((p) => mbm.Position(p.longitude, p.latitude)).toList()),
           lineColor: _colorRuta(provider.rutas[i].seguridad).value,
-          lineWidth: isSelected ? 7.0 : 3.0,
-          lineOpacity: isSelected ? 1.0 : 0.3,
+          lineWidth: isSelected ? 8.0 : 4.0,
+          lineOpacity: isSelected ? 1.0 : 0.4,
           lineJoin: mbm.LineJoin.ROUND,
         ),
       );
@@ -157,41 +205,53 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
   }
 
   void _dibujarMarcadores(MapaProvider mapa, NotificacionProvider noti) async {
-    if (_circleAnnotationManager == null) return;
+    if (_pointAnnotationManager == null) return;
     
     final totalMarkers = noti.alertasMapa.length + (mapa.origenBusqueda != null ? 1 : 0) + (mapa.destinoBusqueda != null ? 1 : 0);
     if (totalMarkers == _lastMarkersCount) return;
     _lastMarkersCount = totalMarkers;
 
-    await _circleAnnotationManager?.deleteAll();
+    await _pointAnnotationManager?.deleteAll();
     _idToAlerta.clear();
 
     for (var alerta in noti.alertasMapa) {
-      final color = _getTipoColor(alerta.tipo);
-      final annotation = await _circleAnnotationManager?.create(
-        mbm.CircleAnnotationOptions(
+      final tipoId = _getTipoKey(alerta.tipo);
+      final annotation = await _pointAnnotationManager?.create(
+        mbm.PointAnnotationOptions(
           geometry: mbm.Point(coordinates: mbm.Position(alerta.longitud, alerta.latitud)),
-          circleRadius: 15.0,
-          circleColor: color.value,
-          circleStrokeWidth: 3.0,
-          circleStrokeColor: Colors.white.value,
+          iconImage: tipoId,
+          iconSize: 0.5,
         ),
       );
       if (annotation != null) _idToAlerta[annotation.id] = alerta;
     }
 
     if (mapa.origenBusqueda != null) {
-      _circleAnnotationManager?.create(mbm.CircleAnnotationOptions(
+      _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(mapa.origenBusqueda!.longitude, mapa.origenBusqueda!.latitude)),
-        circleRadius: 8.0, circleColor: Colors.green.value, circleStrokeWidth: 2.0, circleStrokeColor: Colors.white.value,
+        iconImage: "marker-15",
+        iconColor: Colors.green.value,
       ));
     }
     if (mapa.destinoBusqueda != null) {
-      _circleAnnotationManager?.create(mbm.CircleAnnotationOptions(
+      _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(mapa.destinoBusqueda!.longitude, mapa.destinoBusqueda!.latitude)),
-        circleRadius: 10.0, circleColor: Colors.red.value, circleStrokeWidth: 2.5, circleStrokeColor: Colors.white.value,
+        iconImage: "rocket-15",
+        iconColor: Colors.red.value,
       ));
     }
+  }
+
+  String _getTipoKey(String tipo) {
+    final t = tipo.toLowerCase();
+    if (t.contains('accident')) return 'accident';
+    if (t.contains('inundacion') || t.contains('flood')) return 'flood';
+    if (t.contains('bache') || t.contains('pothole')) return 'pothole';
+    if (t.contains('bloqueo') || t.contains('blockage')) return 'blockage';
+    if (t.contains('derrumbe') || t.contains('landslide')) return 'landslide';
+    if (t.contains('niebla') || t.contains('fog')) return 'fog';
+    if (t.contains('luz') || t.contains('nolight')) return 'nolight';
+    return 'pothole';
   }
 
   Color _colorRuta(String seguridad) {
@@ -200,14 +260,6 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
       case 'naranja': case 'medio': return AppColors.riskMedium;
       default: return AppColors.primary;
     }
-  }
-
-  Color _getTipoColor(String tipo) {
-    final t = tipo.toLowerCase();
-    if (t.contains('accident')) return AppColors.danger;
-    if (t.contains('inundacion') || t.contains('flood')) return AppColors.primary;
-    if (t.contains('bache') || t.contains('pothole')) return AppColors.warning;
-    return AppColors.purple;
   }
 
   @override
@@ -222,17 +274,17 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
       onMapCreated: _onMapCreated,
       cameraOptions: mbm.CameraOptions(
         center: mbm.Point(coordinates: mbm.Position(mapaProvider.ubicacionActual.longitude, mapaProvider.ubicacionActual.latitude)),
-        zoom: 14.5,
+        zoom: 15.0,
       ),
     );
   }
 }
 
-class _OnCircleClickListener extends mbm.OnCircleAnnotationClickListener {
+class _OnPointClickListener extends mbm.OnPointAnnotationClickListener {
   final Function(String) onTap;
-  _OnCircleClickListener({required this.onTap});
+  _OnPointClickListener({required this.onTap});
   @override
-  void onCircleAnnotationClick(mbm.CircleAnnotation annotation) {
+  void onPointAnnotationClick(mbm.PointAnnotation annotation) {
     onTap(annotation.id);
   }
 }
