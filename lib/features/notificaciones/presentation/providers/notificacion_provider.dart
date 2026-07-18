@@ -4,16 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:injectable/injectable.dart';
+import '../../../../core/network/session_service.dart';
 import '../../domain/entities/notificacion_entity.dart';
 import '../../domain/repositories/notification_repository.dart';
 
 @injectable
 class NotificacionProvider extends ChangeNotifier {
   final INotificacionRepository repository;
-  String _token = '';
+  final SessionService _sessionService;
 
   List<NotificacionEntity> _notificaciones = [];
-  List<NotificacionEntity> _alertasMapa = []; // Alertas de proximidad activas
+  List<NotificacionEntity> _alertasMapa = []; 
   WebSocketChannel? _channel;
   bool _conectado = false;
   String? _currentRutaId;
@@ -21,24 +22,12 @@ class NotificacionProvider extends ChangeNotifier {
   Timer? _reconnectTimer;
   Timer? _historialRefreshTimer; 
 
-  // Nueva propiedad para alertas urgentes del admin
   NotificacionEntity? _ultimaAlertaUrgente;
   NotificacionEntity? get ultimaAlertaUrgente => _ultimaAlertaUrgente;
 
-  NotificacionProvider(this.repository);
-
-  set token(String nuevoToken) {
-    if (_token != nuevoToken) {
-      _token = nuevoToken;
-      if (_token.isNotEmpty) {
-        _iniciarRefrescoHistorial();
-      } else {
-        _historialRefreshTimer?.cancel();
-      }
-    }
+  NotificacionProvider(this.repository, this._sessionService) {
+    _iniciarRefrescoHistorial();
   }
-
-  String get token => _token;
 
   List<NotificacionEntity> get notificaciones => _notificaciones;
   List<NotificacionEntity> get alertasMapa => _alertasMapa;
@@ -76,9 +65,9 @@ class NotificacionProvider extends ChangeNotifier {
   }
 
   Future<void> cargarHistorial() async {
-    if (_token.isEmpty) return;
+    if (!_sessionService.hasToken) return;
     try {
-      _notificaciones = await repository.getHistorial(_token);
+      _notificaciones = await repository.getHistorial();
       notifyListeners();
     } catch (e) {
       debugPrint("❌ Error cargando historial: $e");
@@ -91,7 +80,7 @@ class NotificacionProvider extends ChangeNotifier {
       _notificaciones[index].leida = true;
       notifyListeners();
       try {
-        await repository.marcarLeida(_token, id);
+        await repository.marcarLeida(id);
       } catch (e) {
         debugPrint('❌ Error marcando como leída: $e');
       }
@@ -99,14 +88,14 @@ class NotificacionProvider extends ChangeNotifier {
   }
 
   Future<void> marcarTodasLeidas() async {
-    if (_token.isEmpty) return;
+    if (!_sessionService.hasToken) return;
     for (var n in _notificaciones) {
       if (n.esAdmin) n.leida = true;
     }
     notifyListeners();
 
     try {
-      await repository.marcarTodasLeidas(_token);
+      await repository.marcarTodasLeidas();
     } catch (e) {
       debugPrint('❌ Error marcando todas como leídas: $e');
       cargarHistorial();
@@ -115,7 +104,7 @@ class NotificacionProvider extends ChangeNotifier {
 
   void escucharRuta(String rutaId) {
     if (_currentRutaId == rutaId && _conectado) return;
-    if (_token.isEmpty) return;
+    if (!_sessionService.hasToken) return;
 
     _currentRutaId = rutaId;
     _desconectarWS();
@@ -127,7 +116,7 @@ class NotificacionProvider extends ChangeNotifier {
         path: '/ws/alertas/$rutaId',
       );
 
-      _channel = IOWebSocketChannel.connect(wsUri, headers: {'Authorization': 'Bearer $_token'});
+      _channel = IOWebSocketChannel.connect(wsUri, headers: {'Authorization': 'Bearer ${_sessionService.token}'});
       _conectado = true;
 
       _channel!.stream.listen(
@@ -146,8 +135,6 @@ class NotificacionProvider extends ChangeNotifier {
     if (data['tipo'] == 'ping' || data['tipo'] == 'pong') return;
     
     if (data['tipo'] == 'telemetria_ack') {
-      // No limpiar alertas aquí para evitar que los iconos desaparezcan parpadeando
-      // El servidor enviará 'alerta_proximidad' si hay nuevas o actualizaciones
       return;
     }
 
@@ -168,7 +155,6 @@ class NotificacionProvider extends ChangeNotifier {
       return;
     }
 
-    // Para cualquier otro mensaje importante, refrescamos.
     cargarHistorial();
   }
 

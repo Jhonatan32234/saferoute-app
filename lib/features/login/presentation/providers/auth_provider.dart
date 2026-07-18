@@ -1,35 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:injectable/injectable.dart';
-
+import '../../../../core/network/session_service.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/login_use_case.dart';
+import 'auth_state.dart';
 
 @lazySingleton
 class AuthProvider extends ChangeNotifier {
   final IAuthRepository authRepository;
+  final SessionService _sessionService;
+  final LoginUseCase _loginUseCase;
 
-  String? _token;
-  String? _nombre;
-  String? _tipo;
-  bool _isLoading = false;
+  AuthState _state = const AuthInitial();
   bool _inicializado = false;
-  String? _error;
   DateTime? _ultimaActividad;
   bool _isOnline = true;
 
-  String? get token => _token;
-  String? get nombre => _nombre;
-  String? get tipo => _tipo;
-  bool get isLoading => _isLoading;
-  bool get inicializado => _inicializado;
-  bool get isLoggedIn => _token != null && _token!.isNotEmpty && !sesionExpirada;
-  String? get error => _error;
-  bool get isOnline => _isOnline;
-
-  AuthProvider(this.authRepository) {
+  AuthProvider(this.authRepository, this._sessionService, this._loginUseCase) {
     _cargarSesion();
     _monitorearConectividad();
   }
+
+  AuthState get state => _state;
+  bool get inicializado => _inicializado;
+  bool get isOnline => _isOnline;
+
+  bool get isLoading => _state is AuthLoading;
+  String? get error => _state is AuthUnauthenticated ? (_state as AuthUnauthenticated).error : null;
+  String? get token => _sessionService.token;
+  String? get nombre => _state is AuthAuthenticated ? (_state as AuthAuthenticated).nombre : null;
+  bool get isLoggedIn => _state is AuthAuthenticated && !sesionExpirada;
 
   void _monitorearConectividad() {
     Connectivity().onConnectivityChanged.listen((result) {
@@ -46,38 +47,47 @@ class AuthProvider extends ChangeNotifier {
   }
 
   bool get sesionExpirada {
-    if (_token == null) return true;
+    if (!_sessionService.hasToken) return true;
     if (_ultimaActividad == null) return true;
     return DateTime.now().difference(_ultimaActividad!) > const Duration(hours: 12);
   }
 
   Future<void> _cargarSesion() async {
     try {
+      await _sessionService.initialize();
       final permiteAutoLogin = await authRepository.getAutoLogin();
 
       if (!permiteAutoLogin) {
+        _state = const AuthUnauthenticated();
         _inicializado = true;
         notifyListeners();
         return;
       }
 
-      final token = await authRepository.getToken();
       final loginTimeStr = await authRepository.getLoginTime();
 
-      if (token != null && loginTimeStr != null) {
+      if (_sessionService.hasToken && loginTimeStr != null) {
         final loginTime = DateTime.parse(loginTimeStr);
         if (DateTime.now().difference(loginTime) > const Duration(hours: 12)) {
           await logout();
           return;
         }
 
-        _token = token;
-        _nombre = await authRepository.getNombre();
-        _tipo = await authRepository.getTipo();
+        final nombre = await authRepository.getNombre() ?? '';
+        final tipo = await authRepository.getTipo() ?? '';
         _ultimaActividad = loginTime;
+
+        _state = AuthAuthenticated(
+          token: _sessionService.token!,
+          nombre: nombre,
+          tipo: tipo,
+        );
+      } else {
+        _state = const AuthUnauthenticated();
       }
     } catch (e) {
-      _token = null;
+      await _sessionService.setToken(null);
+      _state = const AuthUnauthenticated();
     } finally {
       _inicializado = true;
       notifyListeners();
@@ -85,52 +95,42 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> login(String email, String password, {bool recordar = false}) async {
-    _isLoading = true;
-    _error = null;
+    _state = const AuthLoading();
     notifyListeners();
 
-    try {
-      final connectivity = await Connectivity().checkConnectivity();
-      final bool estaOffline = connectivity.contains(ConnectivityResult.none);
-
-      if (estaOffline) {
-        return await _intentoLoginOffline(email, password);
-      }
-
-      final user = await authRepository.login(email, password);
-      _token = user.token;
-      _nombre = user.nombre;
-      _tipo = user.tipo;
-
-      _ultimaActividad = DateTime.now();
-      await authRepository.saveLoginTime(_ultimaActividad!.toIso8601String());
-      await authRepository.setAutoLogin(recordar);
-
-      if (recordar) {
-        await authRepository.guardarCredenciales(email, password);
-      } else {
-        await authRepository.guardarCredenciales(email, "");
-      }
-
-      _isLoading = false;
-      _error = null;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      final errorStr = e.toString();
-
-      if (errorStr.contains('SocketException') ||
-          errorStr.contains('timeout') ||
-          errorStr.contains('Failed host lookup') ||
-          errorStr.contains('Connection refused')) {
-        return await _intentoLoginOffline(email, password);
-      }
-
-      _error = errorStr.replaceFirst('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity.contains(ConnectivityResult.none)) {
+      return await _intentoLoginOffline(email, password);
     }
+
+    final result = await _loginUseCase.execute(email, password);
+
+    return result.fold(
+      (failure) async {
+        if (failure.contains('SocketException') || failure.contains('timeout')) {
+          return await _intentoLoginOffline(email, password);
+        }
+        _state = AuthUnauthenticated(error: failure);
+        notifyListeners();
+        return false;
+      },
+      (user) async {
+        await _sessionService.setToken(user.token);
+        _ultimaActividad = DateTime.now();
+        await authRepository.saveLoginTime(_ultimaActividad!.toIso8601String());
+        await authRepository.setAutoLogin(recordar);
+
+        if (recordar) {
+          await authRepository.guardarCredenciales(email, password);
+        } else {
+          await authRepository.guardarCredenciales(email, "");
+        }
+
+        _state = AuthAuthenticated(token: user.token, nombre: user.nombre, tipo: user.tipo);
+        notifyListeners();
+        return true;
+      },
+    );
   }
 
   Future<bool> _intentoLoginOffline(String email, String password) async {
@@ -141,21 +141,18 @@ class AuthProvider extends ChangeNotifier {
         offlineCreds['password'] == password &&
         offlineToken != null) {
 
-      _token = offlineToken;
-      _nombre = await authRepository.getOfflineNombre();
-      _tipo = await authRepository.getOfflineTipo();
-
+      await _sessionService.setToken(offlineToken);
+      final nombre = await authRepository.getOfflineNombre() ?? '';
+      final tipo = await authRepository.getOfflineTipo() ?? '';
       final loginTimeStr = await authRepository.getLoginTime();
       _ultimaActividad = loginTimeStr != null ? DateTime.parse(loginTimeStr) : DateTime.now();
 
-      _isLoading = false;
-      _error = null;
+      _state = AuthAuthenticated(token: offlineToken, nombre: nombre, tipo: tipo);
       notifyListeners();
       return true;
     }
 
-    _error = 'Sin conexión. No se encontraron credenciales guardadas para este usuario.';
-    _isLoading = false;
+    _state = const AuthUnauthenticated(error: 'Sin conexión. No se encontraron credenciales guardadas.');
     notifyListeners();
     return false;
   }
@@ -165,20 +162,15 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    // 1. Limpiar estado local inmediatamente para que la UI reaccione rápido
-    _token = null;
-    _nombre = null;
-    _tipo = null;
+    await _sessionService.setToken(null);
     _ultimaActividad = null;
-    _error = null;
+    _state = const AuthUnauthenticated();
     _inicializado = true;
     notifyListeners();
-
-    // 2. Limpiar persistencia en segundo plano
     try {
       await authRepository.logout();
     } catch (e) {
-      debugPrint("Error al limpiar sesión en repositorio: \$e");
+      debugPrint("Error al limpiar sesión: $e");
     }
   }
 }

@@ -10,13 +10,13 @@ class ProfileRepositoryImpl implements IProfileRepository {
   ProfileRepositoryImpl(this._remoteDataSource);
 
   @override
-  Future<ProfileEntity> getProfile(String token) async {
-    return await _remoteDataSource.getProfile(token);
+  Future<ProfileEntity> getProfile() async {
+    return await _remoteDataSource.getProfile();
   }
 
   @override
-  Future<void> updateProfile(String token, String nombre, String telefono, String email) async {
-    await _remoteDataSource.updateProfile(token, {
+  Future<void> updateProfile(String nombre, String telefono, String email) async {
+    await _remoteDataSource.updateProfile({
       'nombre': nombre,
       'telefono': telefono,
       'email': email,

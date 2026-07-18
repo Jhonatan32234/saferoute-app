@@ -5,37 +5,27 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:injectable/injectable.dart';
 import '../../domain/repositories/reporte_repository.dart';
+import 'reporte_state.dart';
 
 @injectable
 class ReporteProvider extends ChangeNotifier {
   final IReporteRepository _repository;
   final FlutterSecureStorage _storage;
-  String _token = '';
   StreamSubscription? _connectivitySubscription;
+
+  ReporteState _state = const ReporteInitial();
 
   ReporteProvider(this._repository, this._storage) {
     _initConnectivityListener();
     sincronizarPendientes();
   }
 
-  set token(String nuevoToken) {
-    if (_token != nuevoToken) {
-      _token = nuevoToken;
-      if (_token.isNotEmpty) {
-        sincronizarPendientes();
-      }
-    }
-  }
+  ReporteState get state => _state;
 
-  bool _enviando = false;
-  String? _ultimoResultado;
-  String? _error;
-  bool _sincronizando = false;
-
-  bool get enviando => _enviando;
-  String? get ultimoResultado => _ultimoResultado;
-  String? get error => _error;
-  bool get sincronizando => _sincronizando;
+  // Helpers UI
+  bool get enviando => _state is ReporteLoading;
+  String? get ultimoResultado => _state is ReporteSuccess ? 'éxito' : (_state is ReporteError ? 'error' : null);
+  String? get error => _state is ReporteError ? (_state as ReporteError).error : null;
 
   void _initConnectivityListener() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
@@ -52,11 +42,7 @@ class ReporteProvider extends ChangeNotifier {
     String notaVoz = '',
     String rutaId = 'sin-ruta',
   }) async {
-    if (_enviando) return;
-
-    _enviando = true;
-    _error = null;
-    _ultimoResultado = null;
+    _state = const ReporteLoading();
     notifyListeners();
 
     try {
@@ -66,31 +52,25 @@ class ReporteProvider extends ChangeNotifier {
         longitud: longitud,
         notaVoz: notaVoz.trim(),
         rutaId: rutaId,
-        token: _token,
       );
-      _ultimoResultado = 'éxito';
-      _error = null;
+      _state = const ReporteSuccess();
     } catch (e) {
-      final errorStr = e.toString();
+      final errorStr = e.toString().replaceFirst('Exception: ', '');
       if (errorStr.contains('SocketException') ||
           errorStr.contains('timeout') ||
           errorStr.contains('Failed host lookup') ||
           errorStr.contains('Connection refused')) {
 
         await _guardarReporteLocal(tipo, latitud, longitud, notaVoz, rutaId);
-        _ultimoResultado = 'éxito';
-        _error = 'Reporte guardado. Se sincronizará al recuperar la conexión.';
+        _state = const ReporteSuccess(message: 'Reporte guardado localmente');
       } else {
-        _ultimoResultado = 'error';
-        _error = errorStr.replaceAll('Exception: ', '');
+        _state = ReporteError(errorStr);
       }
     } finally {
-      _enviando = false;
       notifyListeners();
 
       Timer(const Duration(seconds: 4), () {
-        _ultimoResultado = null;
-        _error = null;
+        _state = const ReporteInitial();
         notifyListeners();
       });
     }
@@ -118,17 +98,12 @@ class ReporteProvider extends ChangeNotifier {
   }
 
   Future<void> sincronizarPendientes() async {
-    if (_sincronizando || _token.isEmpty) return;
-
     try {
       final data = await _storage.read(key: 'reportes_pendientes');
       if (data == null) return;
 
       List<dynamic> pendientes = jsonDecode(data);
       if (pendientes.isEmpty) return;
-
-      _sincronizando = true;
-      notifyListeners();
 
       List<dynamic> fallidos = [];
 
@@ -140,7 +115,6 @@ class ReporteProvider extends ChangeNotifier {
             longitud: (reporte['longitud'] as num).toDouble(),
             notaVoz: reporte['nota_voz'],
             rutaId: reporte['ruta_id'],
-            token: _token,
           );
         } catch (e) {
           final errorStr = e.toString();
@@ -163,7 +137,6 @@ class ReporteProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint("Error crítico de sincronización: $e");
     } finally {
-      _sincronizando = false;
       notifyListeners();
     }
   }

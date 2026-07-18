@@ -26,34 +26,10 @@ class SafeRouteApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => getIt<AuthProvider>()),
-        ChangeNotifierProxyProvider<AuthProvider, MapaProvider>(
-          create: (_) => getIt<MapaProvider>(),
-          update: (_, auth, provider) {
-            provider!.token = auth.token ?? '';
-            return provider;
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, ReporteProvider>(
-          create: (_) => getIt<ReporteProvider>(),
-          update: (_, auth, provider) {
-            provider!.token = auth.token ?? '';
-            return provider;
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, NotificacionProvider>(
-          create: (_) => getIt<NotificacionProvider>(),
-          update: (_, auth, provider) {
-            provider!.token = auth.token ?? '';
-            return provider;
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, ProfileProvider>(
-          create: (_) => getIt<ProfileProvider>(),
-          update: (_, auth, provider) {
-            provider!.token = auth.token ?? '';
-            return provider;
-          },
-        ),
+        ChangeNotifierProvider(create: (_) => getIt<MapaProvider>()),
+        ChangeNotifierProvider(create: (_) => getIt<ReporteProvider>()),
+        ChangeNotifierProvider(create: (_) => getIt<NotificacionProvider>()),
+        ChangeNotifierProvider(create: (_) => getIt<ProfileProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(360, 690),

@@ -1,15 +1,13 @@
 import 'dart:convert';
-import 'dart:developer';
-import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import '../../../../core/network/api_client.dart';
 import '../models/ruta_model.dart';
 import '../models/destino_reciente_model.dart';
 
 @lazySingleton
 class HomeRemoteDataSource {
-  final http.Client client;
+  final ApiClient client;
   final DotEnv dotenv;
 
   String get baseUrl => dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
@@ -21,14 +19,9 @@ class HomeRemoteDataSource {
     required double origenLon,
     required double destinoLat,
     required double destinoLon,
-    required String token,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/api/rutas'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
       body: jsonEncode({
         'origen_lat': origenLat,
         'origen_lon': origenLon,
@@ -52,7 +45,6 @@ class HomeRemoteDataSource {
     required double destinoLon,
     required String polylineRuta,
     required String rutaId,
-    required String token,
   }) async {
     final payload = {
       'origen_lat': origenLat,
@@ -65,10 +57,6 @@ class HomeRemoteDataSource {
     
     final response = await client.post(
       Uri.parse('$baseUrl/api/viajes/iniciar'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
       body: jsonEncode(payload),
     );
 
@@ -84,7 +72,6 @@ class HomeRemoteDataSource {
   Future<bool> finalizarViaje({
     required String viajeId,
     String? password,
-    required String token,
   }) async {
     final body = {
       'viaje_id': viajeId,
@@ -95,25 +82,15 @@ class HomeRemoteDataSource {
 
     final response = await client.post(
       Uri.parse('$baseUrl/api/viajes/finalizar'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
       body: jsonEncode(body),
     );
 
     return response.statusCode == 200 || response.statusCode == 201;
   }
 
-  // --- DESTINOS RECIENTES ---
-
-  Future<List<DestinoRecienteModel>> getDestinosRecientes(String token) async {
+  Future<List<DestinoRecienteModel>> getDestinosRecientes() async {
     final response = await client.get(
       Uri.parse('$baseUrl/api/user/destinos?limite=10'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
     );
 
     if (response.statusCode == 200) {
@@ -128,14 +105,9 @@ class HomeRemoteDataSource {
     required String nombre,
     required double lat,
     required double lon,
-    required String token,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/api/user/destinos'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
       body: jsonEncode({
         'nombre': nombre,
         'lat': lat,
@@ -148,13 +120,9 @@ class HomeRemoteDataSource {
     }
   }
 
-  Future<void> eliminarDestinoReciente(String id, String token) async {
+  Future<void> eliminarDestinoReciente(String id) async {
     final response = await client.delete(
       Uri.parse('$baseUrl/api/user/destinos?id=$id'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
     );
 
     if (response.statusCode != 200) {

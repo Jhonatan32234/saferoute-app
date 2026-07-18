@@ -10,7 +10,6 @@ class ProfileProvider extends ChangeNotifier {
   ProfileEntity? _profile;
   bool _isLoading = false;
   String? _error;
-  String? _token;
 
   ProfileProvider(this._repository);
 
@@ -18,24 +17,13 @@ class ProfileProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  set token(String value) {
-    if (_token != value) {
-      _token = value;
-      if (_token != null && _token!.isNotEmpty) {
-        cargarPerfil();
-      }
-    }
-  }
-
   Future<void> cargarPerfil() async {
-    if (_token == null || _token!.isEmpty) return;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _profile = await _repository.getProfile(_token!);
+      _profile = await _repository.getProfile();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -49,14 +37,12 @@ class ProfileProvider extends ChangeNotifier {
     required String telefono,
     required String email,
   }) async {
-    if (_token == null || _token!.isEmpty) return false;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _repository.updateProfile(_token!, nombre, telefono, email);
+      await _repository.updateProfile(nombre, telefono, email);
       await cargarPerfil();
       return true;
     } catch (e) {

@@ -16,7 +16,6 @@ class ReporteRepositoryImpl implements IReporteRepository {
     required double longitud,
     required String notaVoz,
     required String rutaId,
-    required String token,
   }) async {
     return await _api.crearReporte(
       tipo: tipo,
@@ -24,7 +23,6 @@ class ReporteRepositoryImpl implements IReporteRepository {
       longitud: longitud,
       notaVoz: notaVoz,
       rutaId: rutaId,
-      token: token,
     );
   }
 }

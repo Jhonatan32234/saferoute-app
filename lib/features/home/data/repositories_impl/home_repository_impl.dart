@@ -16,14 +16,12 @@ class HomeRepositoryImpl implements IHomeRepository {
     required double origenLon,
     required double destinoLat,
     required double destinoLon,
-    required String token,
   }) async {
     return await _api.getRutas(
       origenLat: origenLat,
       origenLon: origenLon,
       destinoLat: destinoLat,
       destinoLon: destinoLon,
-      token: token,
     );
   }
 
@@ -35,7 +33,6 @@ class HomeRepositoryImpl implements IHomeRepository {
     required double destinoLon,
     required String polylineRuta,
     required String rutaId,
-    required String token,
   }) async {
     return await _api.iniciarViaje(
       origenLat: origenLat,
@@ -44,7 +41,6 @@ class HomeRepositoryImpl implements IHomeRepository {
       destinoLon: destinoLon,
       polylineRuta: polylineRuta,
       rutaId: rutaId,
-      token: token,
     );
   }
 
@@ -52,19 +48,16 @@ class HomeRepositoryImpl implements IHomeRepository {
   Future<bool> finalizarViaje({
     required String viajeId,
     String? password,
-    required String token,
   }) async {
     return await _api.finalizarViaje(
       viajeId: viajeId,
       password: password,
-      token: token,
     );
   }
 
   @override
-  Future<List<DestinoReciente>> getDestinosRecientes(String token) async {
-    final models = await _api.getDestinosRecientes(token);
-    // Cast explícito para asegurar compatibilidad de tipos en el override
+  Future<List<DestinoReciente>> getDestinosRecientes() async {
+    final models = await _api.getDestinosRecientes();
     return models.map((m) => m as DestinoReciente).toList();
   }
 
@@ -73,18 +66,16 @@ class HomeRepositoryImpl implements IHomeRepository {
     required String nombre,
     required double lat,
     required double lon,
-    required String token,
   }) async {
     await _api.guardarDestinoReciente(
       nombre: nombre,
       lat: lat,
       lon: lon,
-      token: token,
     );
   }
 
   @override
-  Future<void> eliminarDestinoReciente(String id, String token) async {
-    await _api.eliminarDestinoReciente(id, token);
+  Future<void> eliminarDestinoReciente(String id) async {
+    await _api.eliminarDestinoReciente(id);
   }
 }

@@ -124,16 +124,18 @@ class _MainScreenState extends State<MainScreen> {
       await _pedirPermisos();
     }
 
-    await _mapaProvider.inicializarUbicacion();
-    await _mapaProvider.cargarClusters();
-    await _notiProvider.cargarHistorial();
+    // Inicializaciones en paralelo para mejorar rendimiento
+    await Future.wait([
+      _mapaProvider.inicializarUbicacion(),
+      _mapaProvider.cargarClusters(),
+      _notiProvider.cargarHistorial(),
+    ]);
 
     if (mounted && !_mapaProvider.zonaInicializada) {
       _mapaProvider.actualizarZonaUbicacion();
     }
     
-    // Forzar re-centrado inicial una vez que tenemos la ubicación
-    if (mounted && _mapboxController != null) {
+    if (mounted) {
       _recenter();
     }
   }

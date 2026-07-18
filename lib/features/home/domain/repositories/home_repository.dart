@@ -7,7 +7,6 @@ abstract class IHomeRepository {
     required double origenLon,
     required double destinoLat,
     required double destinoLon,
-    required String token,
   });
 
   Future<String> iniciarViaje({
@@ -17,24 +16,21 @@ abstract class IHomeRepository {
     required double destinoLon,
     required String polylineRuta,
     required String rutaId,
-    required String token,
   });
 
   Future<bool> finalizarViaje({
     required String viajeId,
     String? password,
-    required String token,
   });
 
   // --- DESTINOS RECIENTES ---
-  Future<List<DestinoReciente>> getDestinosRecientes(String token);
+  Future<List<DestinoReciente>> getDestinosRecientes();
   
   Future<void> guardarDestinoReciente({
     required String nombre,
     required double lat,
     required double lon,
-    required String token,
   });
 
-  Future<void> eliminarDestinoReciente(String id, String token);
+  Future<void> eliminarDestinoReciente(String id);
 }

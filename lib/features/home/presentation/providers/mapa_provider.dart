@@ -9,10 +9,10 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// Imports absolutos a tu propia feature
 import 'package:saferoute_app/features/home/domain/repositories/home_repository.dart';
 import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
 import 'package:saferoute_app/features/home/domain/entities/destino_reciente_entity.dart';
+import 'mapa_state.dart';
 
 @injectable
 class MapaProvider extends ChangeNotifier {
@@ -20,34 +20,22 @@ class MapaProvider extends ChangeNotifier {
   final DotEnv _dotenv;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
-  String _token = '';
   String _userId = '';
   bool _zonaInicializada = false;
 
-  MapaProvider(this.homeRepository, this._dotenv);
+  MapaState _state = const MapaInitial();
 
-  set token(String nuevoToken) {
-    if (_token != nuevoToken) {
-      _token = nuevoToken;
-      if (_token.isNotEmpty) {
-        cargarDestinosRecientes();
-      }
-    }
+  MapaProvider(this.homeRepository, this._dotenv) {
+    cargarDestinosRecientes();
   }
+
+  MapaState get state => _state;
+
   set userId(String id) => _userId = id;
 
   LatLng _ubicacionActual = const LatLng(16.753, -93.115);
-  List<RutaEntity> _rutas = [];
-  bool _cargandoRutas = false;
-  String? _error;
-
-  RutaEntity? _rutaSeleccionada;
-  List<List<LatLng>> _polilineas = [];
-  bool _mostrarSoloSeleccionada = false;
-
   LatLng? _origenBusqueda;
   LatLng? _destinoBusqueda;
-
   String _textoOrigen = '';
   String _textoDestino = '';
   bool _usarUbicacionActualPersistente = true;
@@ -55,27 +43,42 @@ class MapaProvider extends ChangeNotifier {
   StreamSubscription<Position>? _posicionStream;
   bool _rastreoActivo = false;
 
-  // --- Propiedades del Viaje ---
-  String? _viajeId;
-  bool _enViaje = false;
-  bool _viajeCargando = false;
-  bool _desviado = false;
   WebSocketChannel? _socket;
   Timer? _telemetriaTimer;
-  Timer? _telemetriaNotiTimer;
   
-  // --- Historial de Destinos ---
   List<DestinoReciente> _destinosRecientes = [];
   bool _cargandoDestinos = false;
 
   // Getters
   LatLng get ubicacionActual => _ubicacionActual;
-  List<RutaEntity> get rutas => _rutas;
-  bool get cargandoRutas => _cargandoRutas;
-  String? get error => _error;
-  RutaEntity? get rutaSeleccionada => _rutaSeleccionada;
-  List<List<LatLng>> get polilineas => _polilineas;
-  bool get mostrarSoloSeleccionada => _mostrarSoloSeleccionada;
+  bool get cargandoRutas => _state is MapaLoading;
+  String? get error => _state is MapaError ? (_state as MapaError).message : null;
+  
+  List<RutaEntity> get rutas {
+    if (_state is MapaRoutesLoaded) return (_state as MapaRoutesLoaded).rutas;
+    if (_state is MapaInTrip) return [(_state as MapaInTrip).ruta];
+    return [];
+  }
+
+  List<List<LatLng>> get polilineas {
+    if (_state is MapaRoutesLoaded) return (_state as MapaRoutesLoaded).polilineas;
+    if (_state is MapaInTrip) {
+      final ruta = (_state as MapaInTrip).ruta;
+      return [ruta.coordenadas.map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble())).toList()];
+    }
+    return [];
+  }
+
+  RutaEntity? get rutaSeleccionada {
+    if (_state is MapaInTrip) return (_state as MapaInTrip).ruta;
+    if (_state is MapaRoutesLoaded) {
+      final s = _state as MapaRoutesLoaded;
+      if (s.selectedIndex != null) return s.rutas[s.selectedIndex!];
+    }
+    return null;
+  }
+
+  bool get mostrarSoloSeleccionada => _state is MapaInTrip || (_state is MapaRoutesLoaded && (_state as MapaRoutesLoaded).selectedIndex != null);
   LatLng? get origenBusqueda => _origenBusqueda;
   LatLng? get destinoBusqueda => _destinoBusqueda;
   
@@ -85,10 +88,10 @@ class MapaProvider extends ChangeNotifier {
   bool get zonaInicializada => _zonaInicializada;
   bool get rastreoActivo => _rastreoActivo;
 
-  bool get enViaje => _enViaje;
-  bool get viajeCargando => _viajeCargando;
-  bool get desviado => _desviado;
-  String? get viajeId => _viajeId;
+  bool get enViaje => _state is MapaInTrip;
+  bool get viajeCargando => _state is MapaLoading;
+  bool get desviado => _state is MapaInTrip && (_state as MapaInTrip).desviado;
+  String? get viajeId => _state is MapaInTrip ? (_state as MapaInTrip).viajeId : null;
 
   List<DestinoReciente> get destinosRecientes => _destinosRecientes;
   bool get cargandoDestinos => _cargandoDestinos;
@@ -163,59 +166,52 @@ class MapaProvider extends ChangeNotifier {
     required double destinoLat,
     required double destinoLon,
   }) async {
-    _cargandoRutas = true;
-    _error = null;
-    _rutaSeleccionada = null;
-    _polilineas = [];
-    _mostrarSoloSeleccionada = false;
+    _state = const MapaLoading();
     _origenBusqueda = LatLng(origenLat, origenLon);
     _destinoBusqueda = LatLng(destinoLat, destinoLon);
     notifyListeners();
 
     try {
-      _rutas = await homeRepository.getRutas(
+      final rutas = await homeRepository.getRutas(
         origenLat: origenLat,
         origenLon: origenLon,
         destinoLat: destinoLat,
         destinoLon: destinoLon,
-        token: _token,
       );
 
-      _polilineas = [];
-      for (final ruta in _rutas) {
+      final polilineas = <List<LatLng>>[];
+      for (final ruta in rutas) {
         if (ruta.coordenadas.isNotEmpty) {
-          _polilineas.add(ruta.coordenadas
+          polilineas.add(ruta.coordenadas
               .map((c) => LatLng((c[0] as num).toDouble(), (c[1] as num).toDouble()))
               .toList());
         }
       }
+
+      _state = MapaRoutesLoaded(rutas: rutas, polilineas: polilineas);
     } catch (e) {
-      _error = e.toString();
+      _state = MapaError(e.toString());
     } finally {
-      _cargandoRutas = false;
       notifyListeners();
     }
   }
 
   void seleccionarRuta(int index) {
-    if (index >= 0 && index < _rutas.length) {
-      _rutaSeleccionada = _rutas[index];
-      _mostrarSoloSeleccionada = true;
+    if (_state is MapaRoutesLoaded) {
+      _state = (_state as MapaRoutesLoaded).copyWith(selectedIndex: index);
       notifyListeners();
     }
   }
 
   void mostrarTodasLasRutas() {
-    _mostrarSoloSeleccionada = false;
-    _rutaSeleccionada = null;
-    notifyListeners();
+    if (_state is MapaRoutesLoaded) {
+      _state = (_state as MapaRoutesLoaded).copyWith(selectedIndex: null);
+      notifyListeners();
+    }
   }
 
   void limpiarBusqueda() {
-    _rutas = [];
-    _polilineas = [];
-    _rutaSeleccionada = null;
-    _mostrarSoloSeleccionada = false;
+    _state = const MapaInitial();
     _origenBusqueda = null;
     _destinoBusqueda = null;
     notifyListeners();
@@ -233,12 +229,13 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> cargarClusters() async {}
 
-  // --- LÓGICA DE VIAJES ---
-
   Future<void> iniciarViaje() async {
-    if (_rutaSeleccionada == null) return;
+    if (_state is! MapaRoutesLoaded) return;
+    final currentState = _state as MapaRoutesLoaded;
+    final index = currentState.selectedIndex ?? 0;
+    final ruta = currentState.rutas[index];
     
-    _viajeCargando = true;
+    _state = const MapaLoading();
     notifyListeners();
 
     try {
@@ -247,24 +244,20 @@ class MapaProvider extends ChangeNotifier {
         origenLon: _origenBusqueda!.longitude,
         destinoLat: _destinoBusqueda!.latitude,
         destinoLon: _destinoBusqueda!.longitude,
-        polylineRuta: _rutaSeleccionada!.polyline,
-        rutaId: _rutaSeleccionada!.nombre,
-        token: _token,
+        polylineRuta: ruta.polyline,
+        rutaId: ruta.nombre,
       );
 
-      _viajeId = id;
-      _enViaje = true;
+      _state = MapaInTrip(ruta: ruta, viajeId: id);
       await _storage.write(key: 'viaje_id_activo', value: id);
 
-      // Guardar en el historial de la API
       try {
         await homeRepository.guardarDestinoReciente(
           nombre: _textoDestino,
           lat: _destinoBusqueda!.latitude,
           lon: _destinoBusqueda!.longitude,
-          token: _token,
         );
-        cargarDestinosRecientes(); // Refrescar lista
+        cargarDestinosRecientes();
       } catch (e) {
         debugPrint("Error guardando destino en API: $e");
       }
@@ -276,18 +269,18 @@ class MapaProvider extends ChangeNotifier {
       });
 
     } catch (e) {
-      _error = "Error al iniciar viaje: $e";
+      _state = MapaError("Error al iniciar viaje: $e");
     } finally {
-      _viajeCargando = false;
       notifyListeners();
     }
   }
 
   void _conectarWebSocket() {
-    if (_viajeId == null) return;
+    if (_state is! MapaInTrip) return;
+    final currentState = _state as MapaInTrip;
     
     final wsBaseUrl = _dotenv.maybeGet('WS_BASE_URL') ?? 'ws://10.0.2.2:8080';
-    final wsUrl = "$wsBaseUrl/ws/alertas/${_rutaSeleccionada?.nombre}?user_id=$_userId";
+    final wsUrl = "$wsBaseUrl/ws/alertas/${currentState.ruta.nombre}?user_id=$_userId";
     
     try {
       _socket = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -297,8 +290,10 @@ class MapaProvider extends ChangeNotifier {
           if (data['estado_viaje'] == 'desviado') {
             _manejarDesvio();
           } else {
-            _desviado = false;
-            notifyListeners();
+            if (_state is MapaInTrip) {
+              _state = (_state as MapaInTrip).copyWith(desviado: false);
+              notifyListeners();
+            }
           }
         }
       }, onError: (err) {
@@ -312,7 +307,7 @@ class MapaProvider extends ChangeNotifier {
   }
 
   void _enviarTelemetriaActual() async {
-    if (_socket == null || !_enViaje) return;
+    if (_socket == null || _state is! MapaInTrip) return;
 
     try {
       final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
@@ -321,7 +316,7 @@ class MapaProvider extends ChangeNotifier {
         "lat": pos.latitude,
         "lon": pos.longitude,
         "velocidad_kmh": pos.speed * 3.6,
-        "ruta_id": _rutaSeleccionada?.nombre,
+        "ruta_id": (_state as MapaInTrip).ruta.nombre,
         "timestamp": DateTime.now().toIso8601String()
       };
       _socket!.sink.add(jsonEncode(payload));
@@ -331,44 +326,42 @@ class MapaProvider extends ChangeNotifier {
   }
 
   void _manejarDesvio() {
-    if (!_desviado) {
-      _desviado = true;
+    if (_state is MapaInTrip && !(_state as MapaInTrip).desviado) {
+      _state = (_state as MapaInTrip).copyWith(desviado: true);
       HapticFeedback.vibrate();
       notifyListeners();
     }
   }
 
   Future<bool> finalizarViaje({String? password}) async {
-    if (_viajeId == null) return false;
+    if (_state is! MapaInTrip) return false;
+    final currentState = _state as MapaInTrip;
 
-    _viajeCargando = true;
+    final oldState = _state;
+    _state = const MapaLoading();
     notifyListeners();
 
     try {
       final exito = await homeRepository.finalizarViaje(
-        viajeId: _viajeId!,
+        viajeId: currentState.viajeId,
         password: password,
-        token: _token,
       );
 
       if (exito) {
         _limpiarViaje();
         return true;
       }
+      _state = oldState; // Restaurar si falla
       return false;
     } catch (e) {
-      _error = "Error al finalizar: $e";
+      _state = MapaError("Error al finalizar: $e");
       return false;
     } finally {
-      _viajeCargando = false;
       notifyListeners();
     }
   }
 
   void _limpiarViaje() {
-    _enViaje = false;
-    _viajeId = null;
-    _desviado = false;
     _telemetriaTimer?.cancel();
     _socket?.sink.close();
     _storage.delete(key: 'viaje_id_activo');
@@ -385,14 +378,11 @@ class MapaProvider extends ChangeNotifier {
     );
   }
 
-  // --- DESTINOS RECIENTES ---
-  
   Future<void> cargarDestinosRecientes() async {
-    if (_token.isEmpty) return;
     _cargandoDestinos = true;
     notifyListeners();
     try {
-      _destinosRecientes = await homeRepository.getDestinosRecientes(_token);
+      _destinosRecientes = await homeRepository.getDestinosRecientes();
     } catch (e) {
       debugPrint("Error cargando destinos recientes: $e");
     } finally {
@@ -403,7 +393,7 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> eliminarDestinoReciente(String id) async {
     try {
-      await homeRepository.eliminarDestinoReciente(id, _token);
+      await homeRepository.eliminarDestinoReciente(id);
       _destinosRecientes.removeWhere((d) => d.id == id);
       notifyListeners();
     } catch (e) {
@@ -417,5 +407,15 @@ class MapaProvider extends ChangeNotifier {
     _socket?.sink.close();
     _posicionStream?.cancel();
     super.dispose();
+  }
+}
+
+extension on MapaInTrip {
+  MapaInTrip copyWith({bool? desviado}) {
+    return MapaInTrip(
+      ruta: ruta,
+      viajeId: viajeId,
+      desviado: desviado ?? this.desviado,
+    );
   }
 }
