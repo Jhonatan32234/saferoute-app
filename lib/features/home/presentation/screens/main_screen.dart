@@ -124,7 +124,6 @@ class _MainScreenState extends State<MainScreen> {
       await _pedirPermisos();
     }
 
-    // Inicializaciones en paralelo para mejorar rendimiento
     await Future.wait([
       _mapaProvider.inicializarUbicacion(),
       _mapaProvider.cargarClusters(),
@@ -234,7 +233,6 @@ class _MainScreenState extends State<MainScreen> {
               setState(() {
                 _mapboxController = controller;
               });
-              // Recenter tan pronto como el controlador esté listo
               _recenter();
             },
           ),
@@ -266,54 +264,47 @@ class _OverlayManager extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Positioned.fill(
       child: SafeArea(
-        bottom: false, // Manejamos el bottom manualmente para evitar choques con nav bar
+        bottom: false,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, MediaQuery.of(context).padding.bottom + 16.h),
+          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, bottomPadding + 16.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Parte Superior: Info de Ruta
               if (tieneRutas) const RutaPillWidget(),
-
               const Spacer(),
-
-              // Botones Flotantes Laterales
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Lado Izquierdo: Buscar
                   if (!tieneRutas)
                     HomeSearchBar(onTap: onSearchTap)
                   else
                     const SizedBox.shrink(),
 
-                  // Lado Derecho: Recenter
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 72.r, // Aumentado de 64 a 72 para máxima comodidad
-                        height: 72.r,
+                        width: 58.r,
+                        height: 58.r,
                         child: FloatingActionButton(
                           onPressed: onRecenterTap,
                           backgroundColor: Colors.white,
-                          elevation: 6,
+                          elevation: 4,
                           shape: const CircleBorder(),
-                          child: Icon(Icons.my_location_rounded, color: theme.colorScheme.primary, size: 36.r), // Icono más grande
+                          child: Icon(Icons.my_location_rounded, color: theme.colorScheme.primary, size: 26.r), 
                         ),
                       ),
-                      SizedBox(height: 16.h),
+                      SizedBox(height: 12.h),
                     ],
                   ),
                 ],
               ),
-
-              SizedBox(height: 32.h), // Aumentado de 24 a 32 para separar más de los botones inferiores
-
-              // Parte Inferior: Panel de Reportes
+              SizedBox(height: 32.h),
               const HomeReportPanel(),
             ],
           ),

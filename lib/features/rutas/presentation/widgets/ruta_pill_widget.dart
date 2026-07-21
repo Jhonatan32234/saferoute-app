@@ -79,8 +79,11 @@ class RutaPillWidget extends StatelessWidget {
     }
 
     if (mapaProvider.rutas.isNotEmpty) {
+      final orientation = MediaQuery.of(context).orientation;
+      final maxHeight = orientation == Orientation.landscape ? 150.h : 220.h;
+
       return Container(
-        constraints: BoxConstraints(maxHeight: 220.h), 
+        constraints: BoxConstraints(maxHeight: maxHeight),
         padding: EdgeInsets.all(10.r),
         decoration: _pillDecoration(context),
         child: Column(
