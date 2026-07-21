@@ -265,13 +265,12 @@ class _OverlayManager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    
+    final theme = Theme.of(context);
     return Positioned.fill(
       child: SafeArea(
         bottom: false, // Manejamos el bottom manualmente para evitar choques con nav bar
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, bottomPadding + 16.h),
+          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, MediaQuery.of(context).padding.bottom + 16.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -295,18 +294,24 @@ class _OverlayManager extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      FloatingActionButton(
-                        onPressed: onRecenterTap,
-                        backgroundColor: Colors.white,
-                        elevation: 4,
-                        mini: true,
-                        child: const Icon(Icons.my_location_rounded, color: Colors.blue, size: 20),
+                      SizedBox(
+                        width: 72.r, // Aumentado de 64 a 72 para máxima comodidad
+                        height: 72.r,
+                        child: FloatingActionButton(
+                          onPressed: onRecenterTap,
+                          backgroundColor: Colors.white,
+                          elevation: 6,
+                          shape: const CircleBorder(),
+                          child: Icon(Icons.my_location_rounded, color: theme.colorScheme.primary, size: 36.r), // Icono más grande
+                        ),
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 16.h),
                     ],
                   ),
                 ],
               ),
+
+              SizedBox(height: 32.h), // Aumentado de 24 a 32 para separar más de los botones inferiores
 
               // Parte Inferior: Panel de Reportes
               const HomeReportPanel(),

@@ -16,15 +16,31 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val GPS_CHANNEL = "com.jmj.saferoute/gps"
     private val USB_DEBUG_CHANNEL = "com.jmj.saferoute/usb_debug"
+    private val SECURITY_CHANNEL = "com.jmj.saferoute/security"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Bloqueo de capturas de pantalla y grabación (Medida RASP)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // Eliminamos el bloqueo global para controlarlo desde Flutter
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Canal para control de seguridad (capturas de pantalla)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SECURITY_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setSecureMode" -> {
+                    val enabled = call.arguments as? Boolean ?: false
+                    if (enabled) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         // Canal para detección de Fake GPS
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, GPS_CHANNEL).setMethodCallHandler { call, result ->

@@ -15,15 +15,15 @@ class HomeSearchBar extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 56.r,
-        height: 56.r,
+        width: 60.r,
+        height: 60.r,
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
               color: theme.colorScheme.primary.withOpacity(0.3),
-              blurRadius: 12.r,
+              blurRadius: 14.r,
               offset: Offset(0, 4.h),
             ),
           ],
@@ -31,7 +31,7 @@ class HomeSearchBar extends StatelessWidget {
         child: Icon(
           Icons.search_rounded,
           color: theme.colorScheme.onPrimary,
-          size: 28.r,
+          size: 32.r,
         ),
       ),
     );

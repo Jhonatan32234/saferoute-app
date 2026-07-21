@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:saferoute_app/core/theme/app_colors.dart';
+import 'package:saferoute_app/core/di/injection.dart';
+import 'package:saferoute_app/core/security/security_service.dart';
 import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
 import 'ruta_card.dart';
 
@@ -78,7 +80,7 @@ class RutaPillWidget extends StatelessWidget {
 
     if (mapaProvider.rutas.isNotEmpty) {
       return Container(
-        constraints: BoxConstraints(maxHeight: 220.h), // Reducido de 300
+        constraints: BoxConstraints(maxHeight: 220.h), 
         padding: EdgeInsets.all(10.r),
         decoration: _pillDecoration(context),
         child: Column(
@@ -177,9 +179,9 @@ class RutaPillWidget extends StatelessWidget {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No aún')),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                provider.finalizarViaje();
+                await provider.finalizarViaje();
               },
               child: const Text('Llegué seguro'),
             ),
@@ -187,43 +189,10 @@ class RutaPillWidget extends StatelessWidget {
         ),
       );
     } else {
-      final controller = TextEditingController();
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Finalización Anticipada'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Aún estás lejos. Por seguridad, ingresa tu contraseña para detener el viaje.'),
-              SizedBox(height: 16.h),
-              TextField(
-                controller: controller,
-                obscureText: true,
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Contraseña'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Volver')),
-            ElevatedButton(
-              onPressed: () async {
-                final exito = await provider.finalizarViaje(password: controller.text);
-                if (exito) {
-                  if (context.mounted) Navigator.pop(ctx);
-                } else {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contraseña incorrecta.')),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
-              child: const Text('Confirmar'),
-            ),
-          ],
-        ),
+        barrierDismissible: false,
+        builder: (ctx) => _FinalizacionAnticipadaDialog(provider: provider),
       );
     }
   }
@@ -271,6 +240,98 @@ class RutaPillWidget extends StatelessWidget {
       case 'amarillo': return AppColors.riskMedium;
       case 'rojo': return AppColors.riskHigh;
       default: return Colors.grey;
+    }
+  }
+}
+
+class _FinalizacionAnticipadaDialog extends StatefulWidget {
+  final MapaProvider provider;
+  const _FinalizacionAnticipadaDialog({required this.provider});
+
+  @override
+  State<_FinalizacionAnticipadaDialog> createState() => _FinalizacionAnticipadaDialogState();
+}
+
+class _FinalizacionAnticipadaDialogState extends State<_FinalizacionAnticipadaDialog> {
+  final _controller = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    getIt<SecurityService>().setSecureMode(true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    getIt<SecurityService>().setSecureMode(false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Finalización Anticipada'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Aún estás lejos. Por seguridad, ingresa tu contraseña para detener el viaje.'),
+            SizedBox(height: 16.h),
+            TextField(
+              controller: _controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(), 
+                labelText: 'Contraseña',
+                hintText: 'Tu contraseña de acceso',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context), 
+          child: const Text('Volver')
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _handleConfirmar,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.danger, 
+            foregroundColor: Colors.white,
+          ),
+          child: _isLoading 
+            ? SizedBox(width: 20.r, height: 20.r, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Confirmar'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleConfirmar() async {
+    final password = _controller.text.trim();
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa tu contraseña')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    final exito = await widget.provider.finalizarViaje(password: password);
+    
+    if (mounted) {
+      if (exito) {
+        Navigator.pop(context);
+      } else {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contraseña incorrecta.')),
+        );
+      }
     }
   }
 }
