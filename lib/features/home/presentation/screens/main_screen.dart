@@ -32,9 +32,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   LatLng? _puntoEnfocado;
-  String? _ultimaRutaIdEscuchada;
-  Timer? _telemetriaTimer;
   mbm.MapboxMap? _mapboxController;
+  bool _initialFixDone = false;
   
   late ReporteProvider _reporteProvider;
   late MapaProvider _mapaProvider;
@@ -43,11 +42,9 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
-    _telemetriaTimer?.cancel();
     if (_providersInitialized) {
       _reporteProvider.removeListener(_onReporteCompletado);
-      _mapaProvider.removeListener(_onRutaChanged);
-      _notiProvider.removeListener(_onNotificacionActualizada);
+      _mapaProvider.removeListener(_onLocationFix);
     }
     super.dispose();
   }
@@ -59,13 +56,20 @@ class _MainScreenState extends State<MainScreen> {
       _reporteProvider = context.read<ReporteProvider>();
       _mapaProvider = context.read<MapaProvider>();
       _notiProvider = context.read<NotificacionProvider>();
-
+      
       _reporteProvider.addListener(_onReporteCompletado);
-      _mapaProvider.addListener(_onRutaChanged);
-      _notiProvider.addListener(_onNotificacionActualizada);
+      _mapaProvider.addListener(_onLocationFix);
 
       _providersInitialized = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _prepararApp());
+    }
+  }
+
+  void _onLocationFix() {
+    // Si la ubicación cambia respecto al valor por defecto (Tuxtla center), centrar una sola vez
+    if (!_initialFixDone && (_mapaProvider.ubicacionActual.latitude != 16.753)) {
+      _initialFixDone = true;
+      _recenter();
     }
   }
 
@@ -77,76 +81,11 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _onRutaChanged() {
-    if (!mounted) return;
-    final String idActual = _mapaProvider.rutaSeleccionada?.id ?? 'sin-ruta';
-    if (idActual == _ultimaRutaIdEscuchada) return;
-    
-    _ultimaRutaIdEscuchada = idActual;
-    _telemetriaTimer?.cancel();
-
-    if (_mapaProvider.rutaSeleccionada != null) {
-      _iniciarSeguimientoRuta(idActual);
-    } else {
-      _notiProvider.desconectarRuta();
-    }
-  }
-
-  void _iniciarSeguimientoRuta(String rutaId) {
-    _telemetriaTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _notiProvider.enviarTelemetria(
-        _mapaProvider.ubicacionActual.latitude,
-        _mapaProvider.ubicacionActual.longitude,
-        0,
-        rutaId,
-      );
-    });
-
-    setState(() => _puntoEnfocado = null);
-    _notiProvider.escucharRuta(rutaId);
-  }
-
-  void _onNotificacionActualizada() {
-    if (!mounted) return;
-    if (_notiProvider.ultimaAlertaUrgente != null) {
-      final alerta = _notiProvider.ultimaAlertaUrgente!;
-      _notiProvider.limpiarAlertaUrgente();
-      _mostrarAlertaUrgente(alerta);
-    }
-  }
-
   Future<void> _prepararApp() async {
-    if (Platform.isAndroid) {
-      await _pedirPermisos();
-    }
-
     await Future.wait([
       _mapaProvider.inicializarUbicacion(),
-      _mapaProvider.cargarClusters(),
       _notiProvider.cargarHistorial(),
     ]);
-
-    if (mounted && !_mapaProvider.zonaInicializada) {
-      _mapaProvider.actualizarZonaUbicacion();
-    }
-    
-    if (mounted) {
-      _recenter();
-    }
-  }
-
-  Future<void> _pedirPermisos() async {
-    try {
-      final plugin = FlutterLocalNotificationsPlugin();
-      await plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
-    } catch (e) {
-      debugPrint('Error permisos: $e');
-    }
   }
 
   void _mostrarNotificaciones() {
@@ -156,8 +95,6 @@ class _MainScreenState extends State<MainScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => NotificacionesPanelV2(
         onNotificacionTap: (lat, lon) {
-          final destino = LatLng(lat, lon);
-          setState(() => _puntoEnfocado = destino);
           _mapboxController?.flyTo(
             mbm.CameraOptions(center: mbm.Point(coordinates: mbm.Position(lon, lat)), zoom: 15.5),
             mbm.MapAnimationOptions(duration: 1000)
@@ -176,22 +113,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _mostrarAlertaUrgente(dynamic alerta) {
-    HapticFeedback.heavyImpact();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AdminAlertDialog(alerta: alerta),
-    );
-  }
-
-  void _mostrarDetalleAlerta(dynamic alerta) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertaDetalleDialog(alerta: alerta),
-    );
-  }
-
   void _recenter() {
     if (_mapboxController == null) return;
     _mapboxController?.flyTo(
@@ -204,111 +125,69 @@ class _MainScreenState extends State<MainScreen> {
         ),
         zoom: 15.5,
       ),
-      mbm.MapAnimationOptions(duration: 1200),
+      mbm.MapAnimationOptions(duration: 1000),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final auth = context.watch<AuthProvider>();
     final mapa = context.watch<MapaProvider>();
-
-    final tieneRutas = mapa.rutas.isNotEmpty || mapa.mostrarSoloSeleccionada || mapa.cargandoRutas;
+    final tieneRutas = mapa.rutas.isNotEmpty || mapa.mostrarSoloSeleccionada;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      extendBody: true,
-      appBar: HomeAppBar(
-        online: auth.isOnline,
-        onNotificationsTap: _mostrarNotificaciones,
-      ),
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           HomeMapView(
             puntoEnfocado: _puntoEnfocado,
-            onAlertTap: _mostrarDetalleAlerta,
+            onAlertTap: (alerta) {
+              showDialog(context: context, builder: (_) => AlertaDetalleDialog(alerta: alerta));
+            },
             onResetEnfocado: () => setState(() => _puntoEnfocado = null),
             onControllerCreated: (controller) {
-              setState(() {
-                _mapboxController = controller;
-              });
+              setState(() => _mapboxController = controller);
               _recenter();
             },
           ),
-          
+
           const MapGradients(),
 
-          _OverlayManager(
-            tieneRutas: tieneRutas,
-            onSearchTap: _mostrarBuscadorRutas,
-            onRecenterTap: _recenter,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OverlayManager extends StatelessWidget {
-  final bool tieneRutas;
-  final VoidCallback onSearchTap;
-  final VoidCallback onRecenterTap;
-
-  const _OverlayManager({
-    required this.tieneRutas, 
-    required this.onSearchTap,
-    required this.onRecenterTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Positioned.fill(
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, bottomPadding + 16.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (tieneRutas) const RutaPillWidget(),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.end,
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+              child: Column(
                 children: [
-                  if (!tieneRutas)
-                    HomeSearchBar(onTap: onSearchTap)
-                  else
-                    const SizedBox.shrink(),
+                  HomeAppBar(onNotificationsTap: _mostrarNotificaciones),
+                  
+                  SizedBox(height: 20.h),
 
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 58.r,
-                        height: 58.r,
-                        child: FloatingActionButton(
-                          onPressed: onRecenterTap,
-                          backgroundColor: Colors.white,
-                          elevation: 4,
-                          shape: const CircleBorder(),
-                          child: Icon(Icons.my_location_rounded, color: theme.colorScheme.primary, size: 26.r), 
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                    ],
+                  if (!tieneRutas)
+                    HomeSearchBar(onTap: _mostrarBuscadorRutas)
+                  else
+                    const RutaPillWidget(),
+
+                  const Spacer(),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FloatingActionButton(
+                      onPressed: _recenter,
+                      backgroundColor: Colors.white,
+                      elevation: 4,
+                      mini: true,
+                      child: const Icon(Icons.my_location_rounded, color: Color(0xFF2563EB)),
+                    ),
                   ),
+                  
+                  SizedBox(height: 16.h),
+
+                  const HomeReportPanel(),
                 ],
               ),
-              SizedBox(height: 32.h),
-              const HomeReportPanel(),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

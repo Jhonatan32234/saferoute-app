@@ -166,26 +166,33 @@ class _ReportButtonWidgetState extends State<ReportButtonWidget>
   }
 
   Widget _buildIdleButton() {
-    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => setState(() => _state = ReportState.selecting),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 16.h),
+        padding: EdgeInsets.symmetric(vertical: 18.h),
         decoration: BoxDecoration(
-          color: theme.colorScheme.error,
+          color: const Color(0xFFC93F33), // Rojo intenso del Figma
           borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.warning_amber_rounded, color: theme.colorScheme.onError, size: 20.r),
-            SizedBox(width: 8.w),
+            Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24.r),
+            SizedBox(width: 12.w),
             Text(
               'Reportar incidente',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onError,
-                fontWeight: FontWeight.w800,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
