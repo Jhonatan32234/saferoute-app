@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbm;
 import 'package:provider/provider.dart';
 import 'package:saferoute_app/core/theme/app_colors.dart';
+import 'package:saferoute_app/core/utils/reporte_mapper.dart';
 import '../providers/mapa_provider.dart';
 import '../../../notificaciones/presentation/providers/notificacion_provider.dart';
 import '../../../notificaciones/domain/entities/notificacion_entity.dart';
@@ -35,7 +36,7 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
   final String _styleUrl = "mapbox://styles/dev-saferoute/cmrpjagea00bt01qta2r53wkl";
   final Map<String, NotificacionEntity> _idToAlerta = {};
   String? _lastRutaId;
-  int _lastMarkersCount = 0;
+  int _lastMarkersCount = -1;
 
   late AnimationController _routeAnimationController;
   double _lastAnimValue = 0.0;
@@ -85,30 +86,25 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
       _OnPointClickListener(onTap: (id) => _manejarClicMarcador(id)),
     );
 
-    if (mounted) {
-      _actualizarMapa(forzar: true);
-    }
+    _recenterInicial();
+  }
+
+  void _recenterInicial() {
+    final mapaProvider = context.read<MapaProvider>();
+    _mapboxMap?.setCamera(mbm.CameraOptions(
+      center: mbm.Point(coordinates: mbm.Position(mapaProvider.ubicacionActual.longitude, mapaProvider.ubicacionActual.latitude)),
+      zoom: 15.0,
+    ));
+    _actualizarMapa(forzar: true);
   }
 
   Future<void> _registrarIconos() async {
-    final iconos = [
-      {'id': 'accident', 'icon': Icons.car_crash, 'color': AppColors.danger},
-      {'id': 'flood', 'icon': Icons.water_drop, 'color': AppColors.primary},
-      {'id': 'pothole', 'icon': Icons.circle, 'color': AppColors.warning},
-      {'id': 'blockage', 'icon': Icons.block, 'color': AppColors.purple},
-      {'id': 'landslide', 'icon': Icons.landslide, 'color': const Color(0xFFEA580C)},
-      {'id': 'fog', 'icon': Icons.foggy, 'color': const Color(0xFF0EA5E9)},
-      {'id': 'nolight', 'icon': Icons.lightbulb_outline, 'color': const Color(0xFFEAB308)},
-    ];
-
-    for (var item in iconos) {
-      final bytes = await _generarImagenDeIcono(item['icon'] as IconData, item['color'] as Color);
-      await _mapboxMap?.style.addStyleImage(
-        item['id'] as String,
-        1.0,
-        mbm.MbxImage(width: 100, height: 100, data: bytes),
-        false, [], [], null
-      );
+    for (var item in ReporteMapper.tiposUI) {
+      final color = Color(int.parse((item['color'] as String).replaceFirst('#', '0xFF')));
+      final bytes = await _generarImagenDeIcono(item['icon'] as IconData, color);
+      
+      // ✅ Registramos usando el ID técnico (ej: 'accident', 'flood')
+      await _mapboxMap?.style.addStyleImage(item['tipo'] as String, 1.0, mbm.MbxImage(width: 100, height: 100, data: bytes), false, [], [], null);
     }
   }
 
@@ -116,17 +112,26 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const size = 100.0;
+    
     final paint = Paint()..color = Colors.white;
     canvas.drawCircle(const Offset(size / 2, size / 2), size / 2, paint);
+    
     final borderPaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 6.0;
     canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 3, borderPaint);
+
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     textPainter.text = TextSpan(
       text: String.fromCharCode(icon.codePoint),
-      style: TextStyle(fontSize: 60.0, fontFamily: icon.fontFamily, color: color, package: icon.fontPackage),
+      style: TextStyle(
+        fontSize: 60.0, 
+        fontFamily: icon.fontFamily ?? 'MaterialIcons', 
+        color: color, 
+        package: icon.fontPackage
+      ),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset((size - textPainter.width) / 2, (size - textPainter.height) / 2));
+
     final picture = recorder.endRecording();
     final img = await picture.toImage(size.toInt(), size.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -142,19 +147,25 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     if (_mapboxMap == null) return;
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
+    
     _verificarRuta(mapaProvider, forzar);
     _dibujarMarcadores(mapaProvider, notiProvider);
   }
 
   void _verificarRuta(MapaProvider provider, bool forzar) {
-    final currentId = provider.rutaSeleccionada?.id ?? "list-${provider.rutas.length}";
+    final currentId = provider.rutaSeleccionada?.id ?? (provider.rutas.isNotEmpty ? "list" : null);
+    
+    if (provider.polilineas.isEmpty) {
+      _polylineAnnotationManager?.deleteAll();
+      _lastRutaId = null;
+      return;
+    }
+
     if (currentId != _lastRutaId || forzar) {
       _lastRutaId = currentId;
-      if (provider.polilineas.isNotEmpty) {
-        _routeAnimationController.reset();
-        _routeAnimationController.forward();
-        _ajustarCamaraARuta(provider);
-      }
+      _routeAnimationController.reset();
+      _routeAnimationController.forward();
+      _ajustarCamaraARuta(provider);
     }
   }
 
@@ -183,45 +194,55 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
 
   void _dibujarMarcadores(MapaProvider mapa, NotificacionProvider noti) async {
     if (_pointAnnotationManager == null) return;
+    
     final totalMarkers = noti.alertasMapa.length + (mapa.origenBusqueda != null ? 1 : 0) + (mapa.destinoBusqueda != null ? 1 : 0);
     if (totalMarkers == _lastMarkersCount) return;
     _lastMarkersCount = totalMarkers;
+    
     await _pointAnnotationManager?.deleteAll();
     _idToAlerta.clear();
+
     for (var alerta in noti.alertasMapa) {
-      final tipoId = _getTipoKey(alerta.tipo);
+      // ✅ Normalización forzada usando el nuevo mapper robusto
+      final imgId = ReporteMapper.normalize(alerta.tipo);
+      
       final annotation = await _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(alerta.longitud, alerta.latitud)),
-        iconImage: tipoId, iconSize: 0.5,
+        iconImage: imgId, 
+        iconSize: 0.6,
       ));
       if (annotation != null) _idToAlerta[annotation.id] = alerta;
     }
-  }
 
-  String _getTipoKey(String tipo) {
-    final t = tipo.toLowerCase();
-    if (t.contains('accident')) return 'accident';
-    if (t.contains('inundacion') || t.contains('flood')) return 'flood';
-    if (t.contains('bache') || t.contains('pothole')) return 'pothole';
-    if (t.contains('bloqueo') || t.contains('blockage')) return 'blockage';
-    if (t.contains('derrumbe') || t.contains('landslide')) return 'landslide';
-    if (t.contains('niebla') || t.contains('fog')) return 'fog';
-    if (t.contains('luz') || t.contains('nolight')) return 'nolight';
-    return 'pothole';
+    if (mapa.origenBusqueda != null) {
+      _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
+        geometry: mbm.Point(coordinates: mbm.Position(mapa.origenBusqueda!.longitude, mapa.origenBusqueda!.latitude)),
+        iconImage: "marker-15",
+      ));
+    }
+    if (mapa.destinoBusqueda != null) {
+      _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
+        geometry: mbm.Point(coordinates: mbm.Position(mapa.destinoBusqueda!.longitude, mapa.destinoBusqueda!.latitude)),
+        iconImage: "rocket-15",
+      ));
+    }
   }
 
   Color _colorRuta(String seguridad) {
     switch (seguridad.toLowerCase()) {
-      case 'rojo': case 'alto': return AppColors.riskHigh;
-      case 'naranja': case 'medio': return AppColors.riskMedium;
-      default: return AppColors.primary;
+      case 'rojo': case 'alto': return const Color(0xFFDC2626);
+      case 'naranja': case 'medio': return const Color(0xFFD97706);
+      default: return const Color(0xFF2563EB);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final mapaProvider = context.watch<MapaProvider>();
-    if (_mapboxMap != null) Future.microtask(() => _actualizarMapa());
+    final notiProvider = context.watch<NotificacionProvider>();
+    if (_mapboxMap != null) {
+      Future.microtask(() => _actualizarMapa());
+    }
     
     return mbm.MapWidget(
       key: const ValueKey("mapWidget"),

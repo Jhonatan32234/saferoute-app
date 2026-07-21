@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'package:saferoute_app/core/utils/reporte_mapper.dart';
 import '../../../login/presentation/providers/auth_provider.dart';
 import '../../../notificaciones/presentation/providers/notificacion_provider.dart';
 import '../../../notificaciones/presentation/widgets/notificaciones_panel_v2.dart';
@@ -35,6 +36,10 @@ class _MainScreenState extends State<MainScreen> {
   mbm.MapboxMap? _mapboxController;
   bool _initialFixDone = false;
   
+  bool _showSuccessPill = false;
+  String _lastReportType = '';
+  Timer? _pillTimer;
+
   late ReporteProvider _reporteProvider;
   late MapaProvider _mapaProvider;
   late NotificacionProvider _notiProvider;
@@ -42,6 +47,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _pillTimer?.cancel();
     if (_providersInitialized) {
       _reporteProvider.removeListener(_onReporteCompletado);
       _mapaProvider.removeListener(_onLocationFix);
@@ -66,7 +72,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onLocationFix() {
-    // Si la ubicación cambia respecto al valor por defecto (Tuxtla center), centrar una sola vez
     if (!_initialFixDone && (_mapaProvider.ubicacionActual.latitude != 16.753)) {
       _initialFixDone = true;
       _recenter();
@@ -76,9 +81,19 @@ class _MainScreenState extends State<MainScreen> {
   void _onReporteCompletado() {
     if (!mounted) return;
     if (_reporteProvider.ultimoResultado == 'éxito') {
-      _mapaProvider.cargarClusters();
-      _notiProvider.cargarHistorial();
+      _triggerSuccessPill(_lastReportType);
     }
+  }
+
+  void _triggerSuccessPill(String tipo) {
+    _pillTimer?.cancel();
+    setState(() {
+      _showSuccessPill = true;
+      _lastReportType = tipo;
+    });
+    _pillTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showSuccessPill = false);
+    });
   }
 
   Future<void> _prepararApp() async {
@@ -89,18 +104,31 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _mostrarNotificaciones() {
-    showModalBottomSheet(
+    showGeneralDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => NotificacionesPanelV2(
-        onNotificacionTap: (lat, lon) {
-          _mapboxController?.flyTo(
-            mbm.CameraOptions(center: mbm.Point(coordinates: mbm.Position(lon, lat)), zoom: 15.5),
-            mbm.MapAnimationOptions(duration: 1000)
-          );
-        },
-      ),
+      barrierDismissible: true,
+      barrierLabel: 'Alertas',
+      barrierColor: Colors.black.withOpacity(0.3),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: NotificacionesPanelV2(
+            onNotificacionTap: (lat, lon) {
+              _mapboxController?.flyTo(
+                mbm.CameraOptions(center: mbm.Point(coordinates: mbm.Position(lon, lat)), zoom: 15.5),
+                mbm.MapAnimationOptions(duration: 1000)
+              );
+            },
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(anim1),
+          child: child,
+        );
+      },
     );
   }
 
@@ -131,7 +159,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final mapa = context.watch<MapaProvider>();
     final tieneRutas = mapa.rutas.isNotEmpty || mapa.mostrarSoloSeleccionada;
 
@@ -139,36 +166,31 @@ class _MainScreenState extends State<MainScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
+          // 1. Capa Base: Mapa
           HomeMapView(
             puntoEnfocado: _puntoEnfocado,
             onAlertTap: (alerta) {
               showDialog(context: context, builder: (_) => AlertaDetalleDialog(alerta: alerta));
             },
             onResetEnfocado: () => setState(() => _puntoEnfocado = null),
-            onControllerCreated: (controller) {
-              setState(() => _mapboxController = controller);
-              _recenter();
-            },
+            onControllerCreated: (controller) => _mapboxController = controller,
           ),
 
           const MapGradients(),
 
+          // 2. Capa Intermedia: Interfaz Principal
           SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
               child: Column(
                 children: [
                   HomeAppBar(onNotificationsTap: _mostrarNotificaciones),
-                  
                   SizedBox(height: 20.h),
-
                   if (!tieneRutas)
                     HomeSearchBar(onTap: _mostrarBuscadorRutas)
                   else
                     const RutaPillWidget(),
-
                   const Spacer(),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: FloatingActionButton(
@@ -179,15 +201,72 @@ class _MainScreenState extends State<MainScreen> {
                       child: const Icon(Icons.my_location_rounded, color: Color(0xFF2563EB)),
                     ),
                   ),
-                  
                   SizedBox(height: 16.h),
-
-                  const HomeReportPanel(),
+                  HomeReportPanel(onReportSent: (tipo) => _triggerSuccessPill(tipo)),
                 ],
               ),
             ),
           ),
+
+          // 3. CAPA FRONTAL: NOTIFICACIÓN DE ÉXITO (FIGMA)
+          if (_showSuccessPill)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 16.w,
+              right: 16.w,
+              child: _SuccessNotificationPill(tipo: _lastReportType),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _SuccessNotificationPill extends StatelessWidget {
+  final String tipo;
+  const _SuccessNotificationPill({required this.tipo});
+
+  @override
+  Widget build(BuildContext context) {
+    // Usar el mapper para asegurar el nombre en español
+    final String label = ReporteMapper.getLabelFromType(tipo);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12), 
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(4.r),
+              decoration: const BoxDecoration(color: Color(0xFF16A34A), shape: BoxShape.circle),
+              child: const Icon(Icons.check, color: Colors.white, size: 16),
+            ),
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Reporte de $label enviado', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900, color: const Color(0xFF16A34A))),
+                  Text('Gracias por mejorar la seguridad en la ruta', style: TextStyle(fontSize: 13.sp, color: const Color(0xFF15803D), fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

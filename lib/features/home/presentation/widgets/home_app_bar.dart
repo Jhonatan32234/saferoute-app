@@ -12,18 +12,23 @@ class HomeAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Logo y Texto (Sin fondo, igual al Figma)
+        // Logo y Texto (Actualizado con tu asset real)
         Expanded(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/icono.png', width: 22.r, height: 22.r, 
-                  errorBuilder: (_,__,___) => const Icon(Icons.shield, color: Color(0xFF2563EB))),
+              Image.asset(
+                'assets/saferoute_blue_nof.png',
+                width: 18.r,
+                height: 18.r,
+                fit: BoxFit.contain,
+                errorBuilder: (_,__,___) => const Icon(Icons.shield, color: Color(0xFF2563EB)),
+              ),
               SizedBox(width: 10.w),
               Text(
                 'SAFEROUTE',
                 style: TextStyle(
-                  fontSize: 18.sp,
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2.0,
                   color: const Color(0xFF1E293B),

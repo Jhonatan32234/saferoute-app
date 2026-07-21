@@ -1,80 +1,63 @@
-// lib/core/utils/reporte_mapper.dart
+import 'package:flutter/material.dart';
+
 class ReporteMapper {
-  // Mapeo de tipos UI (inglés) a tipos Backend (español)
-  static const Map<String, String> _tipoMap = {
-    'accident': 'accidente',
-    'flood': 'inundacion',
-    'pothole': 'bache',
-    'blockage': 'bloqueo',
-    'landslide': 'derrumbe',
-    'fog': 'niebla',
-    'nolight': 'sin_luz',
-  };
-
-  // Mapeo inverso para mostrar en UI
-  static const Map<String, String> _tipoInverso = {
-    'accidente': 'accident',
-    'inundacion': 'flood',
-    'bache': 'pothole',
-    'bloqueo': 'blockage',
-    'derrumbe': 'landslide',
-    'niebla': 'fog',
-    'sin_luz': 'nolight',
-  };
-
-  // Tipos válidos para el backend (según el código Go)
-  static const List<String> tiposValidosBackend = [
-    'accidente',
-    'inundacion',
-    'bache',
-    'bloqueo',
-    'derrumbe',
-    'niebla',
-    'sin_luz',
-    'otro',  // También acepta 'otro'
-  ];
-
-  // Tipos para la UI con colores y nombres en español
   static const List<Map<String, dynamic>> tiposUI = [
-    {'tipo': 'accident', 'label': 'Accidente', 'color': '#DC2626', 'icon': 'car_crash'},
-    {'tipo': 'flood', 'label': 'Inundación', 'color': '#2563EB', 'icon': 'water_drop'},
-    {'tipo': 'pothole', 'label': 'Bache', 'color': '#D97706', 'icon': 'circle'},
-    {'tipo': 'blockage', 'label': 'Bloqueo', 'color': '#7C3AED', 'icon': 'block'},
-    {'tipo': 'landslide', 'label': 'Derrumbe', 'color': '#EA580C', 'icon': 'landslide'},
-    {'tipo': 'fog', 'label': 'Niebla', 'color': '#0EA5E9', 'icon': 'foggy'},
-    {'tipo': 'nolight', 'label': 'Sin luz', 'color': '#EAB308', 'icon': 'lightbulb_outline'},
+    {'tipo': 'accident', 'label': 'Accidente', 'color': '#F44336', 'icon': Icons.car_crash},
+    {'tipo': 'flood', 'label': 'Inundación', 'color': '#2196F3', 'icon': Icons.water},
+    {'tipo': 'pothole', 'label': 'Bache', 'color': '#FF9800', 'icon': Icons.dangerous},
+    {'tipo': 'blockage', 'label': 'Bloqueo', 'color': '#FF5252', 'icon': Icons.block},
+    {'tipo': 'landslide', 'label': 'Derrumbe', 'color': '#795548', 'icon': Icons.landslide},
+    {'tipo': 'fog', 'label': 'Niebla', 'color': '#9E9E9E', 'icon': Icons.foggy},
+    {'tipo': 'nolight', 'label': 'Sin luz', 'color': '#9C27B0', 'icon': Icons.lightbulb_outline},
   ];
 
-  // Convertir tipo UI (inglés) a tipo Backend (español)
-  static String uiToBackend(String tipoUI) {
-    return _tipoMap[tipoUI] ?? tipoUI;
+  /// Convierte cualquier entrada (inglés, español, id) a un ID técnico único (ej: 'accident')
+  static String normalize(String input) {
+    final t = input.toLowerCase().trim();
+    if (t.contains('accident')) return 'accident';
+    if (t.contains('flood') || t.contains('inundacion')) return 'flood';
+    if (t.contains('pothole') || t.contains('bache')) return 'pothole';
+    if (t.contains('block') || t.contains('bloqueo')) return 'blockage';
+    if (t.contains('landslide') || t.contains('derrumbe')) return 'landslide';
+    if (t.contains('fog') || t.contains('niebla')) return 'fog';
+    if (t.contains('light') || t.contains('luz')) return 'nolight';
+    return 'accident'; // Fallback seguro
   }
 
-  // Convertir tipo Backend (español) a tipo UI (inglés)
-  static String backendToUI(String tipoBackend) {
-    return _tipoInverso[tipoBackend] ?? tipoBackend;
+  /// Para enviar al servidor (español)
+  static String toBackend(String technicalId) {
+    switch (technicalId) {
+      case 'accident': return 'accidente';
+      case 'flood': return 'inundacion';
+      case 'pothole': return 'bache';
+      case 'blockage': return 'bloqueo';
+      case 'landslide': return 'derrumbe';
+      case 'fog': return 'niebla';
+      case 'nolight': return 'sin_luz';
+      default: return technicalId;
+    }
   }
 
-  // Validar si un tipo es válido para el backend
-  static bool isValidForBackend(String tipo) {
-    return tiposValidosBackend.contains(tipo);
+  static String getLabel(String input) {
+    final id = normalize(input);
+    return tiposUI.firstWhere((t) => t['tipo'] == id, orElse: () => tiposUI[0])['label'];
   }
 
-  // Obtener el nombre en español de un tipo UI
-  static String getLabelFromUIType(String tipoUI) {
-    final found = tiposUI.firstWhere(
-          (t) => t['tipo'] == tipoUI,
-      orElse: () => {'label': tipoUI},
-    );
-    return found['label'] as String;
+  static IconData getIcon(String input) {
+    final id = normalize(input);
+    return tiposUI.firstWhere((t) => t['tipo'] == id, orElse: () => tiposUI[0])['icon'];
   }
 
-  // Obtener el color de un tipo UI
-  static String getColorFromUIType(String tipoUI) {
-    final found = tiposUI.firstWhere(
-          (t) => t['tipo'] == tipoUI,
-      orElse: () => {'color': '#64748B'},
-    );
-    return found['color'] as String;
+  static Color getColor(String input) {
+    final id = normalize(input);
+    final hex = tiposUI.firstWhere((t) => t['tipo'] == id, orElse: () => tiposUI[0])['color'];
+    return Color(int.parse(hex.replaceFirst('#', '0xFF')));
   }
+
+  // Compatibilidad con código anterior (alias)
+  static String uiToBackend(String uiType) => toBackend(normalize(uiType));
+  static String backendToUI(String backendType) => normalize(backendType);
+  static String getLabelFromType(String type) => getLabel(type);
+  static IconData getIconFromType(String type) => getIcon(type);
+  static Color getColorFromType(String type) => getColor(type);
 }

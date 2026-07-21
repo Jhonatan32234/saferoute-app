@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:saferoute_app/core/theme/app_colors.dart';
+import 'package:saferoute_app/core/utils/reporte_mapper.dart';
 import 'package:saferoute_app/features/notificaciones/domain/entities/notificacion_entity.dart';
 import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
 
@@ -12,431 +12,191 @@ class NotificacionesPanelV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final notiProvider = context.watch<NotificacionProvider>();
-    
-    final notifications = notiProvider.notificaciones
-        .where((n) => n.esAdmin)
-        .toList();
+    final alerts = notiProvider.notificaciones;
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: 0.75.sh),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.08),
-            blurRadius: 32.r,
-            offset: Offset(0, -8.h),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: EdgeInsets.only(top: 12.h),
-            width: 40.w,
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: theme.dividerColor,
-              borderRadius: BorderRadius.circular(2.r),
-            ),
-          ),
-          // Header
-          Padding(
-            padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 16.h),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Centro de Mensajes',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        '${notiProvider.sinLeer} mensajes de administración',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (notifications.isNotEmpty && notiProvider.sinLeer > 0)
-                  TextButton.icon(
-                    onPressed: () => notiProvider.marcarTodasLeidas(),
-                    icon: Icon(Icons.done_all, size: 18.r),
-                    label: Text(
-                      'Leer todos',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                SizedBox(width: 8.w),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 32.r,
-                    height: 32.r,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.close,
-                      size: 16.r,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-          // Lista
-          if (notifications.isEmpty)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.mail_outline,
-                      size: 48.r,
-                      color: theme.disabledColor.withOpacity(0.3),
-                    ),
-                    SizedBox(height: 12.h),
-                    Text(
-                      'No tienes mensajes del administrador',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.hintColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            Flexible(
-              child: ListView.builder(
-                padding: EdgeInsets.symmetric(vertical: 4.h),
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  final n = notifications[index];
-                  return _buildNotificationItem(context, n, notiProvider);
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(
-      BuildContext context,
-      NotificacionEntity n,
-      NotificacionProvider provider,
-      ) {
-    final theme = Theme.of(context);
-    final color = n.esAdmin ? theme.colorScheme.primary : _getTipoColor(n.tipo);
-    final icon = n.esAdmin ? Icons.admin_panel_settings : _getTipoIcon(n.tipo);
-
-    return GestureDetector(
-      onTap: () => _mostrarDetalles(context, n),
+    return Material(
+      color: Colors.transparent,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-        padding: EdgeInsets.all(12.r),
+        width: 0.85.sw, 
         decoration: BoxDecoration(
-          color: n.leida ? theme.colorScheme.surface : theme.colorScheme.primary.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: n.leida ? theme.dividerColor : theme.colorScheme.primary.withOpacity(0.2),
-          ),
-          boxShadow: n.leida
-              ? null
-              : [
+          color: Colors.white,
+          borderRadius: BorderRadius.horizontal(left: Radius.circular(24.r)),
+          boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.primary.withOpacity(0.05),
-              blurRadius: 8.r,
-              offset: Offset(0, 2.h),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(-4, 0),
             ),
           ],
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 36.r,
-              height: 36.r,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 18.r,
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
+            // Header
+            Padding(
+              padding: EdgeInsets.fromLTRB(24.w, 40.h, 20.w, 20.h),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    n.mensaje,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: n.leida ? FontWeight.w500 : FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 4.h),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 12.r,
-                        color: theme.hintColor,
-                      ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        'Hace ${_calcularTiempo(n.timestamp)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Alertas',
+                          style: TextStyle(
+                            fontSize: 24.sp,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF1E293B),
+                          ),
                         ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          '${alerts.length} alertas cercanas',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36.r,
+                      height: 36.r,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
                       ),
-                    ],
+                      child: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            if (!n.leida)
-              GestureDetector(
-                onTap: () => provider.marcarLeida(n.id),
-                child: Container(
-                  padding: EdgeInsets.all(8.r),
-                  margin: EdgeInsets.only(left: 8.w),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    size: 20.r,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            
+            // Lista de Alertas
+            Expanded(
+              child: alerts.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: alerts.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      itemBuilder: (context, index) {
+                        return _AlertItem(
+                          alerta: alerts[index],
+                          onTap: () {
+                            Navigator.pop(context);
+                            onNotificacionTap?.call(alerts[index].latitud, alerts[index].longitud);
+                          },
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  String _calcularTiempo(DateTime timestamp) {
-    final diff = DateTime.now().difference(timestamp);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
-    if (diff.inHours < 24) return '${diff.inHours} h';
-    return '${diff.inDays} d';
-  }
-
-  Color _getTipoColor(String tipo) {
-    final t = tipo.toLowerCase();
-    if (t.contains('accident')) return AppColors.danger;
-    if (t.contains('inundacion') || t.contains('flood')) return AppColors.primary;
-    if (t.contains('bache') || t.contains('pothole')) return AppColors.warning;
-    if (t.contains('bloqueo') || t.contains('blockage')) return AppColors.purple;
-    if (t.contains('derrumbe') || t.contains('landslide')) return const Color(0xFFEA580C);
-    if (t.contains('niebla') || t.contains('fog')) return const Color(0xFF0EA5E9);
-    if (t.contains('luz') || t.contains('nolight')) return const Color(0xFFEAB308);
-    return AppColors.slate500;
-  }
-
-  IconData _getTipoIcon(String tipo) {
-    final t = tipo.toLowerCase();
-    if (t.contains('accident')) return Icons.car_crash;
-    if (t.contains('inundacion') || t.contains('flood')) return Icons.water_drop;
-    if (t.contains('bache') || t.contains('pothole')) return Icons.circle;
-    if (t.contains('bloqueo') || t.contains('blockage')) return Icons.block;
-    if (t.contains('derrumbe') || t.contains('landslide')) return Icons.landslide;
-    if (t.contains('niebla') || t.contains('fog')) return Icons.foggy;
-    if (t.contains('luz') || t.contains('nolight')) return Icons.lightbulb_outline;
-    return Icons.notification_important;
-  }
-
-  void _mostrarDetalles(BuildContext context, NotificacionEntity n) {
-    showDialog(
-      context: context,
-      builder: (context) => _NotificacionDetalleDialog(
-        n: n, 
-        onNotificacionTap: onNotificacionTap,
-        getTipoColor: _getTipoColor,
-        getTipoIcon: _getTipoIcon,
-        calcularTiempo: _calcularTiempo,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_off_outlined, size: 48.r, color: const Color(0xFFCBD5E1)),
+          SizedBox(height: 16.h),
+          const Text(
+            'No hay alertas en tu zona',
+            style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _NotificacionDetalleDialog extends StatelessWidget {
-  final NotificacionEntity n;
-  final Function(double lat, double lon)? onNotificacionTap;
-  final Color Function(String) getTipoColor;
-  final IconData Function(String) getTipoIcon;
-  final String Function(DateTime) calcularTiempo;
+class _AlertItem extends StatelessWidget {
+  final NotificacionEntity alerta;
+  final VoidCallback onTap;
 
-  const _NotificacionDetalleDialog({
-    required this.n,
-    this.onNotificacionTap,
-    required this.getTipoColor,
-    required this.getTipoIcon,
-    required this.calcularTiempo,
-  });
+  const _AlertItem({required this.alerta, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accentColor = n.esAdmin ? theme.colorScheme.primary : getTipoColor(n.tipo);
-    final accentIcon = n.esAdmin ? Icons.admin_panel_settings : getTipoIcon(n.tipo);
+    // Usar la lógica robusta de ReporteMapper
+    final IconData icon = ReporteMapper.getIconFromType(alerta.tipo);
+    final Color color = ReporteMapper.getColorFromType(alerta.tipo);
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-      child: Container(
-        padding: EdgeInsets.all(20.r),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40.r,
-                  height: 40.r,
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(accentIcon, color: accentColor, size: 20.r),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        n.esAdmin ? 'Instrucción de Admin' : 'Detalle de Alerta',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        n.tipo.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: accentColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 32.r,
-                    height: 32.r,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.close, size: 16.r, color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16.h),
+            // Icono con fondo circular suave
             Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16.r),
+              width: 44.r,
+              height: 44.r,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12.r),
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, color: color, size: 20.r),
+            ),
+            SizedBox(width: 16.w),
+            // Información
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    n.mensaje,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                    alerta.mensaje,
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF334155),
+                      height: 1.4,
+                    ),
                   ),
                   SizedBox(height: 8.h),
                   Row(
                     children: [
-                      Icon(Icons.access_time, size: 14.r, color: theme.hintColor),
-                      SizedBox(width: 4.w),
+                      const Icon(Icons.access_time, size: 14, color: Color(0xFF94A3B8)),
+                      SizedBox(width: 6.w),
                       Text(
-                        'Enviado ${calcularTiempo(n.timestamp)}',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                        'Hace ${_timeAgo(alerta.timestamp)}',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: const Color(0xFF94A3B8),
+                        ),
                       ),
                     ],
                   ),
-                  if (n.notaVoz.isNotEmpty) ...[
-                    SizedBox(height: 8.h),
-                    Row(
-                      children: [
-                        Icon(Icons.description, size: 14.r, color: theme.hintColor),
-                        SizedBox(width: 4.w),
-                        Expanded(
-                          child: Text(
-                            n.notaVoz,
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
-            ),
-            SizedBox(height: 16.h),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cerrar'),
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                      if (onNotificacionTap != null) {
-                        onNotificacionTap!(n.latitud, n.longitud);
-                      }
-                    },
-                    icon: const Icon(Icons.location_searching, size: 16),
-                    label: const Text('Localizar'),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _timeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
+    if (diff.inHours < 24) return '${diff.inHours} h';
+    return '${diff.inDays} d';
   }
 }

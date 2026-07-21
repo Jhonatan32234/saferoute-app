@@ -214,6 +214,8 @@ class MapaProvider extends ChangeNotifier {
     _state = const MapaInitial();
     _origenBusqueda = null;
     _destinoBusqueda = null;
+    _textoOrigen = '';
+    _textoDestino = '';
     notifyListeners();
   }
 

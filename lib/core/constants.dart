@@ -39,11 +39,11 @@ class AppConstants {
     {'tipo': 'otro', 'icono': '⚠️', 'label': 'Otro'},
   ];
 
-  // Ciudades predefinidas
+  // Ciudades predefinidas (Coordenadas precisas de centro)
   static const Map<String, Map<String, double>> ciudades = {
-    'Suchiapa': {'lat': 16.723, 'lon': -93.015},
+    'Suchiapa': {'lat': 16.625, 'lon': -93.102},
     'Berriozábal': {'lat': 16.800, 'lon': -93.270},
-    'Chiapa de Corzo': {'lat': 16.707, 'lon': -93.016},
+    'Chiapa de Corzo': {'lat': 16.708, 'lon': -93.015},
     'San Cristóbal': {'lat': 16.737, 'lon': -92.637},
     'Comitán': {'lat': 16.251, 'lon': -92.134},
     'Teopisca': {'lat': 16.543, 'lon': -92.474},

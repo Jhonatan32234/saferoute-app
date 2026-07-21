@@ -1,172 +1,274 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:saferoute_app/core/theme/app_colors.dart';
-import 'package:saferoute_app/core/di/injection.dart';
-import 'package:saferoute_app/core/security/security_service.dart';
-import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
-import 'ruta_card.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/security/security_service.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../home/presentation/providers/mapa_provider.dart';
 
-class RutaPillWidget extends StatelessWidget {
+class RutaPillWidget extends StatefulWidget {
   const RutaPillWidget({super.key});
 
   @override
+  State<RutaPillWidget> createState() => _RutaPillWidgetState();
+}
+
+class _RutaPillWidgetState extends State<RutaPillWidget> {
+  bool _isExpanded = true;
+  bool _showFeedback = false;
+  String? _lastRutaId;
+  Timer? _feedbackTimer;
+
+  @override
+  void dispose() {
+    _feedbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _triggerFeedback() {
+    _feedbackTimer?.cancel();
+    setState(() => _showFeedback = true);
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showFeedback = false);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final mapaProvider = context.watch<MapaProvider>();
 
+    final currentRuta = mapaProvider.rutaSeleccionada?.id ?? (mapaProvider.rutas.isNotEmpty ? "list" : null);
+    if (currentRuta != _lastRutaId && currentRuta != null) {
+      _lastRutaId = currentRuta;
+      Future.microtask(() => _triggerFeedback());
+    }
+
     if (mapaProvider.cargandoRutas || mapaProvider.viajeCargando) {
-      return _buildLoading(context, mapaProvider.viajeCargando ? 'Iniciando viaje...' : 'Calculando rutas...');
+      return _buildStatusPill(context, mapaProvider.viajeCargando ? 'Iniciando viaje...' : 'Calculando rutas...', isLoading: true);
     }
 
     if (mapaProvider.enViaje) {
       return _buildViajeActivo(context, mapaProvider);
     }
 
-    if (mapaProvider.mostrarSoloSeleccionada && mapaProvider.rutaSeleccionada != null) {
-      final ruta = mapaProvider.rutaSeleccionada!;
-      return Container(
-        padding: EdgeInsets.all(10.r),
-        decoration: _pillDecoration(context),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                _buildIndicator(ruta.seguridad),
-                SizedBox(width: 10.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ruta.nombre, 
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, size: 20.r),
-                  onPressed: () => mapaProvider.mostrarTodasLasRutas(),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            SizedBox(
-              width: double.infinity,
-              height: 40.h,
-              child: ElevatedButton(
-                onPressed: () => mapaProvider.iniciarViaje(),
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                  elevation: 0,
-                ),
-                child: Text('INICIAR VIAJE', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary, letterSpacing: 1.1)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     if (mapaProvider.rutas.isNotEmpty) {
-      final orientation = MediaQuery.of(context).orientation;
-      final maxHeight = orientation == Orientation.landscape ? 150.h : 220.h;
-
-      return Container(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        padding: EdgeInsets.all(10.r),
-        decoration: _pillDecoration(context),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Text('Rutas Seguras', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => mapaProvider.limpiarBusqueda(),
-                  child: Icon(Icons.close, size: 20.r, color: theme.hintColor),
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: mapaProvider.rutas.length,
-                itemBuilder: (context, index) {
-                  final ruta = mapaProvider.rutas[index];
-                  return RutaCard(
-                    nombre: ruta.nombre,
-                    tipo: ruta.tipo,
-                    seguridad: ruta.seguridad,
-                    distanciaKm: ruta.distanciaKm,
-                    tiempoMinutos: ruta.tiempoMinutos,
-                    riesgoCombinado: ruta.riesgoCombinado,
-                    onSelect: () => mapaProvider.seleccionarRuta(index),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildRutaOptions(context, mapaProvider);
     }
 
     return const SizedBox.shrink();
   }
 
-  Widget _buildViajeActivo(BuildContext context, MapaProvider provider) {
-    final theme = Theme.of(context);
-    final distanciaM = provider.calcularDistanciaAlDestino();
-    final puedeFinalizarNormal = distanciaM <= 50;
+  Widget _buildRutaOptions(BuildContext context, MapaProvider provider) {
+    final selectedRuta = provider.rutaSeleccionada ?? (provider.rutas.isNotEmpty ? provider.rutas.first : null);
 
-    return Container(
-      padding: EdgeInsets.all(10.r),
-      decoration: _pillDecoration(context).copyWith(
-        border: provider.desviado ? Border.all(color: theme.colorScheme.error, width: 2.r) : null,
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.navigation_rounded, color: theme.colorScheme.primary, size: 22.r),
-          SizedBox(width: 10.w),
-          Expanded(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_showFeedback)
+          _buildStatusPill(context, 'Ruta a ${provider.textoDestino} calculada', isSuccess: true),
+        
+        SizedBox(height: 12.h),
+
+        // 1. Cabecera de Destino (Maldita sea el diseño Figma Perfect)
+        GestureDetector(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            decoration: _cardDecoration(),
+            child: Row(
+              children: [
+                Container(
+                  width: 42.r, height: 42.r,
+                  decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle),
+                  child: const Icon(Icons.location_on, color: Color(0xFF2563EB), size: 20),
+                ),
+                SizedBox(width: 14.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        provider.textoDestino.isNotEmpty ? provider.textoDestino : (selectedRuta?.nombre ?? 'Destino'),
+                        style: TextStyle(
+                          fontSize: 17.sp, 
+                          fontWeight: FontWeight.w900, // Más fuerte tal cual Figma
+                          color: const Color(0xFF1E293B),
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${selectedRuta?.distanciaKm.toStringAsFixed(1)} km  ·  ${selectedRuta?.tiempoMinutos} min',
+                        style: TextStyle(fontSize: 14.sp, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 22, color: Color(0xFF94A3B8)),
+                  onPressed: () => provider.limpiarBusqueda(),
+                  constraints: const BoxConstraints(), padding: EdgeInsets.zero,
+                ),
+                SizedBox(width: 12.w),
+                Icon(_isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: const Color(0xFF94A3B8), size: 26),
+              ],
+            ),
+          ),
+        ),
+
+        if (_isExpanded) ...[
+          SizedBox(height: 10.h),
+          Container(
+            padding: EdgeInsets.all(16.r),
+            decoration: _cardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('En camino', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
-                Text(
-                  distanciaM > 1000 ? '${(distanciaM / 1000).toStringAsFixed(1)} km' : '${distanciaM.toInt()} m restantes',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+                Text('OPCIONES DE RUTA', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w900, color: const Color(0xFF94A3B8), letterSpacing: 1.1)),
+                SizedBox(height: 12.h),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 180.h),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: provider.rutas.length,
+                    separatorBuilder: (_, __) => SizedBox(height: 8.h),
+                    itemBuilder: (context, index) {
+                      final ruta = provider.rutas[index];
+                      return _buildRutaItem(context, ruta, selectedRuta == ruta, () => provider.seleccionarRuta(index));
+                    },
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                SizedBox(
+                  width: double.infinity, height: 52.h,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      provider.iniciarViaje();
+                      setState(() => _isExpanded = false);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                      elevation: 0,
+                    ),
+                    child: Text('Iniciar navegación', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
                 ),
               ],
             ),
           ),
-          SizedBox(
-            height: 36.h,
-            child: ElevatedButton(
-              onPressed: () => _confirmarFinalizacion(context, provider, puedeFinalizarNormal),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: puedeFinalizarNormal ? AppColors.success : theme.colorScheme.error,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 12.w),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-              ),
-              child: const Text('Llegué'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRutaItem(BuildContext context, dynamic ruta, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.all(12.r),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: isSelected ? const Color(0xFF2563EB) : Colors.transparent, width: 2.r),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _formatRutaLabel(ruta.tipo),
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: Colors.black)
             ),
+            Text(
+              '${ruta.distanciaKm.toStringAsFixed(1)} km · ${ruta.tiempoMinutos} min', 
+              style: TextStyle(fontSize: 12.sp, color: const Color(0xFF475569), fontWeight: FontWeight.w600)
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(BuildContext context, String message, {bool isLoading = false, bool isSuccess = false, String? subtitle}) {
+    return Container(
+      width: double.infinity, padding: EdgeInsets.all(12.r),
+      decoration: BoxDecoration(
+        color: isSuccess ? const Color(0xFFF0FDF4) : Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: isSuccess ? const Color(0xFFBBF7D0) : Colors.transparent),
+      ),
+      child: Row(
+        children: [
+          if (isLoading) SizedBox(width: 18.r, height: 18.r, child: const CircularProgressIndicator(strokeWidth: 2))
+          else Container(
+            padding: EdgeInsets.all(2.r),
+            decoration: const BoxDecoration(color: Color(0xFF16A34A), shape: BoxShape.circle),
+            child: const Icon(Icons.check, color: Colors.white, size: 14),
           ),
+          SizedBox(width: 12.w),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: isSuccess ? const Color(0xFF16A34A) : Colors.black)),
+              if (subtitle != null) Text(subtitle, style: TextStyle(fontSize: 13.sp, color: const Color(0xFF16A34A), fontWeight: FontWeight.w500)),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViajeActivo(BuildContext context, MapaProvider provider) {
+    if (_showFeedback) {
+      return Column(
+        children: [
+          _buildStatusPill(context, '¡Navegación iniciada!', subtitle: 'Dirígete hacia ${provider.textoDestino}', isSuccess: true),
+          SizedBox(height: 12.h),
+          _buildActiveHeader(provider),
+        ],
+      );
+    }
+    return _buildActiveHeader(provider);
+  }
+
+  Widget _buildActiveHeader(MapaProvider provider) {
+    final distanciaM = provider.calcularDistanciaAlDestino();
+    final ruta = provider.rutaSeleccionada;
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 42.r, height: 42.r, 
+            decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle), 
+            child: const Icon(Icons.location_on, color: Color(0xFF2563EB), size: 20)
+          ),
+          SizedBox(width: 14.w),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                provider.textoDestino.isNotEmpty ? provider.textoDestino : (ruta?.nombre ?? 'Destino'), 
+                style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w900, color: const Color(0xFF1E293B)), 
+                maxLines: 1, overflow: TextOverflow.ellipsis
+              ),
+              Text(
+                '${distanciaM > 1000 ? (distanciaM / 1000).toStringAsFixed(1) : distanciaM.toInt()} ${distanciaM > 1000 ? "km" : "m"} restantes · ${ruta?.tiempoMinutos ?? ""} min', 
+                style: TextStyle(fontSize: 14.sp, color: const Color(0xFF64748B), fontWeight: FontWeight.w600)
+              ),
+            ],
+          )),
+          IconButton(
+            icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 22), 
+            onPressed: () => _confirmarFinalizacion(context, provider, distanciaM <= 50)
+          ),
+          SizedBox(width: 12.w),
+          const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 26),
         ],
       ),
     );
@@ -200,50 +302,16 @@ class RutaPillWidget extends StatelessWidget {
     }
   }
 
-  Widget _buildLoading(BuildContext context, String msg) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-      decoration: _pillDecoration(context),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(width: 16.r, height: 16.r, child: const CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 12.w),
-          Text(msg, style: theme.textTheme.bodySmall),
-        ],
-      ),
-    );
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8))]);
   }
 
-  Widget _buildIndicator(String seguridad) {
-    return Container(
-      width: 4.w, height: 30.h,
-      decoration: BoxDecoration(
-        color: _colorSeguridad(seguridad),
-        borderRadius: BorderRadius.circular(2.r),
-      ),
-    );
-  }
-
-  BoxDecoration _pillDecoration(BuildContext context) {
-    final theme = Theme.of(context);
-    return BoxDecoration(
-      color: theme.colorScheme.surface.withOpacity(0.98),
-      borderRadius: BorderRadius.circular(20.r),
-      boxShadow: [
-        BoxShadow(color: theme.shadowColor.withOpacity(0.12), blurRadius: 20.r, offset: const Offset(0, 8)),
-      ],
-    );
-  }
-
-  Color _colorSeguridad(String seguridad) {
-    switch (seguridad) {
-      case 'verde': return AppColors.riskLow;
-      case 'amarillo': return AppColors.riskMedium;
-      case 'rojo': return AppColors.riskHigh;
-      default: return Colors.grey;
-    }
+  String _formatRutaLabel(String tipo) {
+    final t = tipo.toLowerCase();
+    if (t.contains('rapida') || t.contains('corta')) return 'Ruta más corta';
+    if (t.contains('equilibrada') || t.contains('disponible')) return 'Ruta equilibrada';
+    if (t.contains('segura') || t.contains('larga')) return 'Ruta larga';
+    return tipo;
   }
 }
 
