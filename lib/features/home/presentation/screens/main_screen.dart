@@ -162,6 +162,30 @@ class _MainScreenState extends State<MainScreen> {
     final mapa = context.watch<MapaProvider>();
     final tieneRutas = mapa.rutas.isNotEmpty || mapa.mostrarSoloSeleccionada;
 
+    // Mostrar error de mapa si existe
+    if (mapa.error != null) {
+      Future.microtask(() {
+        if (mounted) {
+          String userFriendlyError = mapa.error!;
+          if (userFriendlyError.contains('host lookup') || userFriendlyError.contains('SocketException')) {
+            userFriendlyError = 'Sin conexión: Revisa tu internet o el servidor está caído.';
+          } else if (userFriendlyError.contains('timeout')) {
+            userFriendlyError = 'El servidor está tardando mucho en responder. Inténtalo de nuevo.';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(userFriendlyError),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(label: 'Reintentar', textColor: Colors.white, onPressed: () => mapa.limpiarError()),
+            ),
+          );
+          mapa.limpiarError();
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../../core/network/api_client.dart';
@@ -10,7 +11,11 @@ class HomeRemoteDataSource {
   final ApiClient client;
   final DotEnv dotenv;
 
-  String get baseUrl => dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
+  String get baseUrl {
+    final url = dotenv.maybeGet('API_BASE_URL') ?? 'http://10.0.2.2:8080';
+    debugPrint('🔌 Usando API Base URL: $url');
+    return url;
+  }
 
   HomeRemoteDataSource(this.client, this.dotenv);
 
@@ -33,8 +38,13 @@ class HomeRemoteDataSource {
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List<dynamic> jsonList = decoded['rutas'] ?? [];
+      debugPrint('🗺️ Rutas recibidas: ${jsonList.length}');
+      if (jsonList.isNotEmpty) {
+        debugPrint('📍 Primera coordenada de la primera ruta: ${jsonList[0]['geometria_osrm']?[0]}');
+      }
       return jsonList.map((json) => RutaModel.fromJson(json)).toList();
     }
+    debugPrint('❌ Error en getRutas: ${response.statusCode} - ${response.body}');
     throw Exception('Error obteniendo rutas');
   }
 

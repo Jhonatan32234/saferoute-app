@@ -1,10 +1,11 @@
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbm;
 import 'package:provider/provider.dart';
-import 'package:saferoute_app/core/theme/app_colors.dart';
 import 'package:saferoute_app/core/utils/reporte_mapper.dart';
 import '../providers/mapa_provider.dart';
 import '../../../notificaciones/presentation/providers/notificacion_provider.dart';
@@ -40,18 +41,21 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
 
   late AnimationController _routeAnimationController;
   double _lastAnimValue = 0.0;
+  bool _isDrawingRuta = false;
 
   @override
   void initState() {
     super.initState();
-    mbm.MapboxOptions.setAccessToken("pk.eyJ1IjoiZGV2LXNhZmVyb3V0ZSIsImEiOiJjbXJwaW4yNHYwMTAzMnpwemZ2bTZ4MGxqIn0.mrb2nZ82lE8Tn6tMKdhWZQ");
-    
     _routeAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..addListener(() {
-        if ((_routeAnimationController.value - _lastAnimValue).abs() > 0.05) {
+        if ((_routeAnimationController.value - _lastAnimValue).abs() > 0.04) {
           _lastAnimValue = _routeAnimationController.value;
+          _dibujarRutaActual();
+        }
+      })..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
           _dibujarRutaActual();
         }
       });
@@ -87,6 +91,11 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     );
 
     _recenterInicial();
+
+    // Pequeño delay para asegurar que el motor de renderizado esté listo
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _actualizarMapa(forzar: true);
+    });
   }
 
   void _recenterInicial() {
@@ -101,29 +110,92 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
   Future<void> _registrarIconos() async {
     for (var item in ReporteMapper.tiposUI) {
       final color = Color(int.parse((item['color'] as String).replaceFirst('#', '0xFF')));
-      final bytes = await _generarImagenDeIcono(item['icon'] as IconData, color);
-      
-      // ✅ Registramos usando el ID técnico (ej: 'accident', 'flood')
+      final bytes = await _generarImagenLimpia(item['icon'] as IconData, color, hasBackground: true);
       await _mapboxMap?.style.addStyleImage(item['tipo'] as String, 1.0, mbm.MbxImage(width: 100, height: 100, data: bytes), false, [], [], null);
+      await _mapboxMap?.style.addStyleImage(ReporteMapper.uiToBackend(item['tipo'] as String), 1.0, mbm.MbxImage(width: 100, height: 100, data: bytes), false, [], [], null);
     }
+
+    // ✅ BANDERA DE DESTINO (ESTILO FIGMA SOLICITADO)
+    final banderaBytes = await _generarBanderaFigma(const Color(0xFFEF4444));
+    await _mapboxMap?.style.addStyleImage("rocket-15", 1.0, mbm.MbxImage(width: 120, height: 120, data: banderaBytes), false, [], [], null);
+
+    // ✅ ORIGEN (PUNTO VERDE MINIMALISTA)
+    final origenBytes = await _generarPuntoInicioFigma(const Color(0xFF10B981));
+    await _mapboxMap?.style.addStyleImage("marker-15", 1.0, mbm.MbxImage(width: 120, height: 120, data: origenBytes), false, [], [], null);
   }
 
-  Future<Uint8List> _generarImagenDeIcono(IconData icon, Color color) async {
+  Future<Uint8List> _generarBanderaFigma(Color color) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 120.0;
+    
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final basePaint = Paint()..color = color.withOpacity(0.4)..style = PaintingStyle.fill;
+    final strokePaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 6.0..strokeCap = StrokeCap.round;
+
+    // 1. Base circular sutil
+    canvas.drawCircle(const Offset(size * 0.3, size * 0.9), size * 0.12, basePaint);
+
+    // 2. Mástil (Pole)
+    canvas.drawLine(const Offset(size * 0.3, size * 0.15), const Offset(size * 0.3, size * 0.9), strokePaint);
+
+    // 3. Bandera triangular (hacia la derecha)
+    final path = ui.Path();
+    path.moveTo(size * 0.3, size * 0.15);
+    path.lineTo(size * 0.9, size * 0.35);
+    path.lineTo(size * 0.3, size * 0.55);
+    path.close();
+    
+    // Sombra suave para la bandera
+    canvas.drawShadow(path, Colors.black, 4.0, true);
+    canvas.drawPath(path, paint);
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _generarPuntoInicioFigma(Color color) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 120.0;
+    
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final whitePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    
+    // Sombra
+    canvas.drawCircle(const Offset(size/2, size/2), size * 0.3, Paint()..color = Colors.black.withOpacity(0.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+    
+    // Círculo exterior verde
+    canvas.drawCircle(const Offset(size/2, size/2), size * 0.3, paint);
+    
+    // Círculo interior blanco (estilo GPS)
+    canvas.drawCircle(const Offset(size/2, size/2), size * 0.12, whitePaint);
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _generarImagenLimpia(IconData icon, Color color, {bool hasBackground = false}) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const size = 100.0;
     
-    final paint = Paint()..color = Colors.white;
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2, paint);
-    
-    final borderPaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 6.0;
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 3, borderPaint);
+    if (hasBackground) {
+      final paint = Paint()..color = Colors.white.withOpacity(0.9);
+      canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.5, paint);
+      final borderPaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 4.0;
+      canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.5, borderPaint);
+    }
 
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     textPainter.text = TextSpan(
       text: String.fromCharCode(icon.codePoint),
       style: TextStyle(
-        fontSize: 60.0, 
+        fontSize: hasBackground ? 50.0 : 80.0, 
         fontFamily: icon.fontFamily ?? 'MaterialIcons', 
         color: color, 
         package: icon.fontPackage
@@ -148,53 +220,109 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     final mapaProvider = context.read<MapaProvider>();
     final notiProvider = context.read<NotificacionProvider>();
     
+    if (_pointAnnotationManager == null || _polylineAnnotationManager == null) {
+      debugPrint('⏳ Managers no listos, posponiendo actualización');
+      return;
+    }
+
+    if (mapaProvider.rutas.isEmpty && mapaProvider.origenBusqueda == null) {
+      _polylineAnnotationManager?.deleteAll();
+      _pointAnnotationManager?.deleteAll();
+      _lastRutaId = null;
+      _lastMarkersCount = -1;
+      return;
+    }
+
     _verificarRuta(mapaProvider, forzar);
     _dibujarMarcadores(mapaProvider, notiProvider);
+
+    if (!_routeAnimationController.isAnimating && mapaProvider.polilineas.isNotEmpty) {
+      _dibujarRutaActual();
+    }
   }
 
   void _verificarRuta(MapaProvider provider, bool forzar) {
     final currentId = provider.rutaSeleccionada?.id ?? (provider.rutas.isNotEmpty ? "list" : null);
-    
-    if (provider.polilineas.isEmpty) {
-      _polylineAnnotationManager?.deleteAll();
-      _lastRutaId = null;
-      return;
-    }
-
     if (currentId != _lastRutaId || forzar) {
+      bool isSelectionChange = _lastRutaId != null && _lastRutaId != "list" && 
+                               currentId != "list" && currentId != null;
+      
       _lastRutaId = currentId;
-      _routeAnimationController.reset();
-      _routeAnimationController.forward();
-      _ajustarCamaraARuta(provider);
+      if (provider.polilineas.isNotEmpty) {
+        if (isSelectionChange) {
+          _dibujarRutaActual();
+        } else {
+          _routeAnimationController.reset();
+          _routeAnimationController.forward();
+        }
+        _ajustarCamaraARuta(provider);
+      }
     }
   }
 
   void _ajustarCamaraARuta(MapaProvider provider) async {
     if (provider.polilineas.isEmpty) return;
-    final allPoints = provider.polilineas.expand((i) => i).toList();
-    final lineString = mbm.LineString(coordinates: allPoints.map((p) => mbm.Position(p.longitude, p.latitude)).toList());
-    final camera = await _mapboxMap?.cameraForGeometry(lineString.toJson(), mbm.MbxEdgeInsets(top: 80, left: 50, bottom: 350, right: 50), null, null);
-    if (camera != null) _mapboxMap?.flyTo(camera, mbm.MapAnimationOptions(duration: 1200));
+
+    final List<LatLng> allPoints = provider.polilineas.expand((i) => i).toList();
+    if (allPoints.isEmpty) return;
+
+    final lineString = mbm.LineString(coordinates: allPoints.map<mbm.Position>((p) => mbm.Position(p.longitude, p.latitude)).toList());
+    
+    final camera = await _mapboxMap?.cameraForGeometry(
+      lineString.toJson(), 
+      mbm.MbxEdgeInsets(top: 100, left: 70, bottom: 320, right: 70), 
+      null, 
+      null
+    );
+    
+    if (camera != null) {
+      _mapboxMap?.flyTo(camera, mbm.MapAnimationOptions(duration: 1500));
+    }
   }
 
   void _dibujarRutaActual() async {
     final provider = context.read<MapaProvider>();
-    if (_polylineAnnotationManager == null || provider.polilineas.isEmpty) return;
-    await _polylineAnnotationManager?.deleteAll();
-    for (int i = 0; i < provider.polilineas.length; i++) {
-      final points = provider.polilineas[i].take((provider.polilineas[i].length * _routeAnimationController.value).floor().clamp(2, 100000)).toList();
-      final isSelected = provider.rutaSeleccionada != null && provider.rutas[i] == provider.rutaSeleccionada;
-      _polylineAnnotationManager?.create(mbm.PolylineAnnotationOptions(
-        geometry: mbm.LineString(coordinates: points.map((p) => mbm.Position(p.longitude, p.latitude)).toList()),
-        lineColor: _colorRuta(provider.rutas[i].seguridad).value,
-        lineWidth: isSelected ? 8.0 : 4.0, lineOpacity: isSelected ? 1.0 : 0.4, lineJoin: mbm.LineJoin.ROUND,
-      ));
+    if (_polylineAnnotationManager == null || provider.polilineas.isEmpty || _isDrawingRuta) return;
+    
+    _isDrawingRuta = true;
+    
+    try {
+      final selectedRuta = provider.rutaSeleccionada;
+      final optionsList = <mbm.PolylineAnnotationOptions>[];
+
+      debugPrint('🎨 Dibujando ${provider.polilineas.length} rutas.');
+
+      for (int i = 0; i < provider.polilineas.length; i++) {
+        final fullPoints = provider.polilineas[i];
+        
+        // Verificación de selección por ID
+        final isSelected = selectedRuta != null && provider.rutas[i].id == selectedRuta.id;
+        
+        double animValue = _routeAnimationController.isAnimating ? _routeAnimationController.value : 1.0;
+        int visibleCount = (fullPoints.length * animValue).floor().clamp(2, fullPoints.length);
+        final points = fullPoints.take(visibleCount).toList();
+
+        optionsList.add(mbm.PolylineAnnotationOptions(
+          geometry: mbm.LineString(coordinates: points.map<mbm.Position>((p) => mbm.Position(p.longitude, p.latitude)).toList()),
+          lineColor: const Color(0xFF2563EB).value,
+          lineWidth: isSelected ? 9.0 : 6.0, 
+          // Opacidad: 1.0 (seleccionada o si solo hay una), 0.22 (fantasma)
+          lineOpacity: isSelected || (selectedRuta == null && i == 0) ? 1.0 : 0.22,
+          lineJoin: mbm.LineJoin.ROUND,
+        ));
+      }
+
+      await _polylineAnnotationManager?.deleteAll();
+      await _polylineAnnotationManager?.createMulti(optionsList);
+    } catch (e) {
+      debugPrint("❌ Error dibujando rutas: $e");
+    } finally {
+      _isDrawingRuta = false;
     }
   }
 
   void _dibujarMarcadores(MapaProvider mapa, NotificacionProvider noti) async {
     if (_pointAnnotationManager == null) return;
-    
     final totalMarkers = noti.alertasMapa.length + (mapa.origenBusqueda != null ? 1 : 0) + (mapa.destinoBusqueda != null ? 1 : 0);
     if (totalMarkers == _lastMarkersCount) return;
     _lastMarkersCount = totalMarkers;
@@ -203,13 +331,10 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     _idToAlerta.clear();
 
     for (var alerta in noti.alertasMapa) {
-      // ✅ Normalización forzada usando el nuevo mapper robusto
       final imgId = ReporteMapper.normalize(alerta.tipo);
-      
       final annotation = await _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(alerta.longitud, alerta.latitud)),
-        iconImage: imgId, 
-        iconSize: 0.6,
+        iconImage: imgId, iconSize: 0.5,
       ));
       if (annotation != null) _idToAlerta[annotation.id] = alerta;
     }
@@ -217,32 +342,21 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     if (mapa.origenBusqueda != null) {
       _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(mapa.origenBusqueda!.longitude, mapa.origenBusqueda!.latitude)),
-        iconImage: "marker-15",
+        iconImage: "marker-15", iconSize: 0.7,
       ));
     }
     if (mapa.destinoBusqueda != null) {
       _pointAnnotationManager?.create(mbm.PointAnnotationOptions(
         geometry: mbm.Point(coordinates: mbm.Position(mapa.destinoBusqueda!.longitude, mapa.destinoBusqueda!.latitude)),
-        iconImage: "rocket-15",
+        iconImage: "rocket-15", iconSize: 0.8,
       ));
-    }
-  }
-
-  Color _colorRuta(String seguridad) {
-    switch (seguridad.toLowerCase()) {
-      case 'rojo': case 'alto': return const Color(0xFFDC2626);
-      case 'naranja': case 'medio': return const Color(0xFFD97706);
-      default: return const Color(0xFF2563EB);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final mapaProvider = context.watch<MapaProvider>();
-    final notiProvider = context.watch<NotificacionProvider>();
-    if (_mapboxMap != null) {
-      Future.microtask(() => _actualizarMapa());
-    }
+    if (_mapboxMap != null) Future.microtask(() => _actualizarMapa());
     
     return mbm.MapWidget(
       key: const ValueKey("mapWidget"),

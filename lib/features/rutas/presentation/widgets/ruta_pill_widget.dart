@@ -136,7 +136,10 @@ class _RutaPillWidgetState extends State<RutaPillWidget> {
                     separatorBuilder: (_, __) => SizedBox(height: 8.h),
                     itemBuilder: (context, index) {
                       final ruta = provider.rutas[index];
-                      return _buildRutaItem(context, ruta, selectedRuta == ruta, () => provider.seleccionarRuta(index));
+                      final isSelected = selectedRuta?.id == ruta.id;
+                      return _buildRutaItem(context, ruta, isSelected, () {
+                        provider.seleccionarRuta(index);
+                      });
                     },
                   ),
                 ),

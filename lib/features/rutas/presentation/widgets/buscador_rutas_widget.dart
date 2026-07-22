@@ -55,7 +55,8 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
   }
 
   Future<void> _ejecutarBusquedaFinal() async {
-    if (_destinoController.text.isEmpty) return;
+    final queryText = _destinoController.text.trim();
+    if (queryText.isEmpty) return;
     
     setState(() => _estaBuscando = true);
     
@@ -67,14 +68,39 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
         double.parse(first['lon']),
       );
     } else {
-      final query = _destinoController.text.toLowerCase();
-      final entry = AppConstants.ciudades.entries.cast<MapEntry<String, Map<String, double>>?>().firstWhere(
-        (e) => e!.key.toLowerCase().contains(query),
+      final queryLower = queryText.toLowerCase();
+      final cityEntry = AppConstants.ciudades.entries.cast<MapEntry<String, Map<String, double>>?>().firstWhere(
+        (e) => e!.key.toLowerCase().contains(queryLower),
         orElse: () => null,
       );
       
-      if (entry != null) {
-        await _seleccionarDestino(entry.key, entry.value['lat']!, entry.value['lon']!);
+      if (cityEntry != null) {
+        await _seleccionarDestino(cityEntry.key, cityEntry.value['lat']!, cityEntry.value['lon']!);
+      } else {
+        try {
+          final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$queryText,chiapas&format=json&limit=1');
+          final response = await http.get(url, headers: {'User-Agent': 'SafeRouteApp'}).timeout(const Duration(seconds: 15));
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            if (data is List && data.isNotEmpty) {
+              await _seleccionarDestino(
+                data[0]['display_name'].toString().split(',')[0],
+                double.parse(data[0]['lat']),
+                double.parse(data[0]['lon']),
+              );
+              if (mounted) setState(() => _estaBuscando = false);
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint("Error en búsqueda forzada: $e");
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo encontrar la ubicación. Intenta ser más específico.')),
+          );
+        }
       }
     }
     if (mounted) setState(() => _estaBuscando = false);
@@ -96,13 +122,10 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Material(
-        color: Colors.transparent,
-        child: Container(
+        color: Colors.white, // ✅ Color movido aquí para corregir ListTile error
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32.r)),
+        child: SizedBox(
           height: 0.85.sh,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32.r)),
-          ),
           child: Column(
             children: [
               Container(

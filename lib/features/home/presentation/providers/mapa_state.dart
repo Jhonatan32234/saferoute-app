@@ -24,11 +24,16 @@ class MapaRoutesLoaded extends MapaState {
     this.selectedIndex,
   });
 
-  MapaRoutesLoaded copyWith({int? selectedIndex}) {
+  MapaRoutesLoaded copyWith({
+    List<RutaEntity>? rutas,
+    List<List<LatLng>>? polilineas,
+    int? selectedIndex,
+    bool clearSelection = false,
+  }) {
     return MapaRoutesLoaded(
-      rutas: rutas,
-      polilineas: polilineas,
-      selectedIndex: selectedIndex ?? this.selectedIndex,
+      rutas: rutas ?? this.rutas,
+      polilineas: polilineas ?? this.polilineas,
+      selectedIndex: clearSelection ? null : (selectedIndex ?? this.selectedIndex),
     );
   }
 }

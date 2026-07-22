@@ -179,6 +179,11 @@ class MapaProvider extends ChangeNotifier {
         destinoLon: destinoLon,
       );
 
+      if (rutas.isEmpty) {
+        _state = const MapaError('No se encontraron rutas seguras para este destino.');
+        return;
+      }
+
       final polilineas = <List<LatLng>>[];
       for (final ruta in rutas) {
         if (ruta.coordenadas.isNotEmpty) {
@@ -205,7 +210,7 @@ class MapaProvider extends ChangeNotifier {
 
   void mostrarTodasLasRutas() {
     if (_state is MapaRoutesLoaded) {
-      _state = (_state as MapaRoutesLoaded).copyWith(selectedIndex: null);
+      _state = (_state as MapaRoutesLoaded).copyWith(clearSelection: true);
       notifyListeners();
     }
   }
@@ -227,6 +232,13 @@ class MapaProvider extends ChangeNotifier {
       _destinoBusqueda = LatLng(lat, lon);
     }
     notifyListeners();
+  }
+
+  void limpiarError() {
+    if (_state is MapaError) {
+      _state = const MapaInitial();
+      notifyListeners();
+    }
   }
 
   Future<void> cargarClusters() async {}
