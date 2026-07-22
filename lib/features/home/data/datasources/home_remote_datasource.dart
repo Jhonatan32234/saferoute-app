@@ -105,7 +105,14 @@ class HomeRemoteDataSource {
 
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final List<dynamic> list = decoded['destinos'] ?? [];
+      List<dynamic> list;
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map && decoded.containsKey('destinos')) {
+        list = decoded['destinos'];
+      } else {
+        list = [];
+      }
       return list.map((json) => DestinoRecienteModel.fromJson(json)).toList();
     }
     throw Exception('Error cargando destinos recientes');

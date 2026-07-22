@@ -4,6 +4,11 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/network/session_service.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_use_case.dart';
+import 'package:saferoute_app/features/home/presentation/providers/mapa_provider.dart';
+import 'package:saferoute_app/features/notificaciones/presentation/providers/notificacion_provider.dart';
+import 'package:saferoute_app/features/profile/presentation/providers/profile_provider.dart';
+import 'package:saferoute_app/features/reportes/presentation/providers/reporte_provider.dart';
+import 'package:saferoute_app/core/di/injection.dart';
 import 'auth_state.dart';
 
 @lazySingleton
@@ -162,12 +167,27 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // 1. Limpiar token en memoria y almacenamiento
     await _sessionService.setToken(null);
     _ultimaActividad = null;
+    
+    // 2. Resetear otros proveedores para limpiar datos del usuario anterior
+    try {
+      getIt<MapaProvider>().resetTotal();
+      getIt<NotificacionProvider>().resetTotal();
+      getIt<ProfileProvider>().resetTotal();
+      getIt<ReporteProvider>().resetTotal();
+    } catch (e) {
+      debugPrint("Error reseteando proveedores: $e");
+    }
+
+    // 3. Notificar a la UI
     _state = const AuthUnauthenticated();
     _inicializado = true;
     notifyListeners();
+
     try {
+      // 4. Limpiar TODO el almacenamiento local
       await authRepository.logout();
     } catch (e) {
       debugPrint("Error al limpiar sesión: $e");

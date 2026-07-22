@@ -99,6 +99,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _prepararApp() async {
     await Future.wait([
       _mapaProvider.inicializarUbicacion(),
+      _mapaProvider.cargarDestinosRecientes(),
       _notiProvider.cargarHistorial(),
     ]);
   }
@@ -217,12 +218,16 @@ class _MainScreenState extends State<MainScreen> {
                   const Spacer(),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: FloatingActionButton(
-                      onPressed: _recenter,
-                      backgroundColor: Colors.white,
-                      elevation: 4,
-                      mini: true,
-                      child: const Icon(Icons.my_location_rounded, color: Color(0xFF2563EB)),
+                    child: SizedBox(
+                      width: 48.r,
+                      height: 48.r,
+                      child: FloatingActionButton(
+                        onPressed: _recenter,
+                        backgroundColor: Colors.white,
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                        child: Icon(Icons.my_location_rounded, color: const Color(0xFF2563EB), size: 24.r),
+                      ),
                     ),
                   ),
                   SizedBox(height: 16.h),

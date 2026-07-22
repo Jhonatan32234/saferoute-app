@@ -167,7 +167,7 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1033.LoginRemoteDataSource>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
-    gh.factory<_i919.ProfileProvider>(
+    gh.lazySingleton<_i919.ProfileProvider>(
         () => _i919.ProfileProvider(gh<_i894.IProfileRepository>()));
     gh.lazySingleton<_i965.ActualizarPerfilUseCase>(
         () => _i965.ActualizarPerfilUseCase(gh<_i894.IProfileRepository>()));
@@ -205,11 +205,11 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i987.IReporteRepository>(),
               gh<_i378.IReportePendienteRepository>(),
             ));
-    gh.factory<_i740.NotificacionProvider>(() => _i740.NotificacionProvider(
+    gh.lazySingleton<_i740.NotificacionProvider>(() => _i740.NotificacionProvider(
           gh<_i931.INotificacionRepository>(),
           gh<_i505.SessionService>(),
         ));
-    gh.factory<_i117.ReporteProvider>(() => _i117.ReporteProvider(
+    gh.lazySingleton<_i117.ReporteProvider>(() => _i117.ReporteProvider(
           gh<_i987.IReporteRepository>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
@@ -234,7 +234,7 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i0.IHomeRepository>(),
           gh<_i925.IHomeLocalRepository>(),
         ));
-    gh.factory<_i1031.MapaProvider>(() => _i1031.MapaProvider(
+    gh.lazySingleton<_i1031.MapaProvider>(() => _i1031.MapaProvider(
           gh<_i0.IHomeRepository>(),
           gh<_i170.DotEnv>(),
         ));

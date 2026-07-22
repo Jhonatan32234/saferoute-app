@@ -119,9 +119,35 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     final banderaBytes = await _generarBanderaFigma(const Color(0xFFEF4444));
     await _mapboxMap?.style.addStyleImage("rocket-15", 1.0, mbm.MbxImage(width: 120, height: 120, data: banderaBytes), false, [], [], null);
 
-    // ✅ ORIGEN (PUNTO VERDE MINIMALISTA)
+    // ✅ ORIGEN (PUNTO GPS VERDE PREMIUM)
     final origenBytes = await _generarPuntoInicioFigma(const Color(0xFF10B981));
     await _mapboxMap?.style.addStyleImage("marker-15", 1.0, mbm.MbxImage(width: 120, height: 120, data: origenBytes), false, [], [], null);
+  }
+
+  Future<Uint8List> _generarPuntoInicioFigma(Color color) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 120.0;
+    
+    // 1. Halo Exterior Verde Tenue
+    final haloPaint = Paint()..color = color.withOpacity(0.25)..style = PaintingStyle.fill;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size * 0.45, haloPaint);
+
+    // 2. Sombra y Círculo Blanco Intermedio
+    final shadowPaint = Paint()..color = Colors.black.withOpacity(0.15)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(const Offset(size / 2, size / 2 + 2), size * 0.25, shadowPaint);
+    
+    final whitePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size * 0.25, whitePaint);
+
+    // 3. Núcleo Verde Fuerte
+    final solidPaint = Paint()..color = color..style = PaintingStyle.fill;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size * 0.18, solidPaint);
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
   }
 
   Future<Uint8List> _generarBanderaFigma(Color color) async {
@@ -130,48 +156,30 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
     const size = 120.0;
     
     final paint = Paint()..color = color..style = PaintingStyle.fill;
-    final basePaint = Paint()..color = color.withOpacity(0.4)..style = PaintingStyle.fill;
+    final haloPaint = Paint()..color = color.withOpacity(0.25)..style = PaintingStyle.fill; // El círculo transparente de la base
     final strokePaint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 6.0..strokeCap = StrokeCap.round;
 
-    // 1. Base circular sutil
-    canvas.drawCircle(const Offset(size * 0.3, size * 0.9), size * 0.12, basePaint);
+    // 1. EL CÍRCULO ROJO TRANSPARENTE EN LA BASE (Suelo)
+    // Lo dibujamos primero para que esté al fondo
+    canvas.drawCircle(const Offset(size * 0.3, size * 0.88), size * 0.18, haloPaint);
 
     // 2. Mástil (Pole)
-    canvas.drawLine(const Offset(size * 0.3, size * 0.15), const Offset(size * 0.3, size * 0.9), strokePaint);
+    // Empieza un poco arriba de la base del halo
+    canvas.drawLine(const Offset(size * 0.3, size * 0.15), const Offset(size * 0.3, size * 0.88), strokePaint);
 
-    // 3. Bandera triangular (hacia la derecha)
+    // 3. Bandera Triangular
     final path = ui.Path();
     path.moveTo(size * 0.3, size * 0.15);
-    path.lineTo(size * 0.9, size * 0.35);
-    path.lineTo(size * 0.3, size * 0.55);
+    path.lineTo(size * 0.95, size * 0.38);
+    path.lineTo(size * 0.3, size * 0.62);
     path.close();
     
-    // Sombra suave para la bandera
-    canvas.drawShadow(path, Colors.black, 4.0, true);
+    // Sombra sutil para la tela de la bandera
+    canvas.drawShadow(path, Colors.black.withOpacity(0.4), 4.0, true);
     canvas.drawPath(path, paint);
-
-    final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
-  }
-
-  Future<Uint8List> _generarPuntoInicioFigma(Color color) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const size = 120.0;
     
-    final paint = Paint()..color = color..style = PaintingStyle.fill;
-    final whitePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
-    
-    // Sombra
-    canvas.drawCircle(const Offset(size/2, size/2), size * 0.3, Paint()..color = Colors.black.withOpacity(0.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
-    
-    // Círculo exterior verde
-    canvas.drawCircle(const Offset(size/2, size/2), size * 0.3, paint);
-    
-    // Círculo interior blanco (estilo GPS)
-    canvas.drawCircle(const Offset(size/2, size/2), size * 0.12, whitePaint);
+    // Borde blanco muy fino para resaltar la bandera del mástil
+    canvas.drawPath(path, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
 
     final picture = recorder.endRecording();
     final img = await picture.toImage(size.toInt(), size.toInt());
@@ -263,20 +271,54 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
   void _ajustarCamaraARuta(MapaProvider provider) async {
     if (provider.polilineas.isEmpty) return;
 
-    final List<LatLng> allPoints = provider.polilineas.expand((i) => i).toList();
-    if (allPoints.isEmpty) return;
-
-    final lineString = mbm.LineString(coordinates: allPoints.map<mbm.Position>((p) => mbm.Position(p.longitude, p.latitude)).toList());
+    // 1. Recolectar todos los puntos clave para asegurar visibilidad total
+    final List<mbm.Position> keyPoints = [];
     
+    // Añadir puntos de la ruta seleccionada (o todas si no hay selección)
+    final selectedRuta = provider.rutaSeleccionada;
+    if (selectedRuta != null) {
+      final idx = provider.rutas.indexWhere((r) => r.id == selectedRuta.id);
+      if (idx != -1) {
+        keyPoints.addAll(provider.polilineas[idx].map((p) => mbm.Position(p.longitude, p.latitude)));
+      }
+    } else {
+      for (var poly in provider.polilineas) {
+        keyPoints.addAll(poly.map((p) => mbm.Position(p.longitude, p.latitude)));
+      }
+    }
+
+    // FORZAR el origen y destino de búsqueda para que Mapbox no los ignore
+    if (provider.origenBusqueda != null) {
+      keyPoints.add(mbm.Position(provider.origenBusqueda!.longitude, provider.origenBusqueda!.latitude));
+    }
+    if (provider.destinoBusqueda != null) {
+      keyPoints.add(mbm.Position(provider.destinoBusqueda!.longitude, provider.destinoBusqueda!.latitude));
+    }
+
+    if (keyPoints.isEmpty) return;
+
+    // 2. Usar MultiPoint para obligar al mapa a encuadrar CADA punto
+    final geometry = mbm.MultiPoint(coordinates: keyPoints).toJson();
+    
+    // 3. Aplicar ajuste con padding EXTREMO para garantizar visión de ambos puntos
     final camera = await _mapboxMap?.cameraForGeometry(
-      lineString.toJson(), 
-      mbm.MbxEdgeInsets(top: 100, left: 70, bottom: 320, right: 70), 
+      geometry, 
+      mbm.MbxEdgeInsets(
+        top: 150,      // Espacio para barra superior
+        left: 80,      // Margen lateral amplio
+        bottom: 420,   // Margen inferior MUY GRANDE para el panel y botones
+        right: 80      // Margen lateral amplio
+      ), 
       null, 
       null
     );
     
-    if (camera != null) {
-      _mapboxMap?.flyTo(camera, mbm.MapAnimationOptions(duration: 1500));
+    if (camera != null && _mapboxMap != null) {
+      debugPrint('🛰️ Ajustando cámara para mostrar ${keyPoints.length} puntos clave');
+      _mapboxMap?.flyTo(
+        camera, 
+        mbm.MapAnimationOptions(duration: 1800)
+      );
     }
   }
 
@@ -290,12 +332,20 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
       final selectedRuta = provider.rutaSeleccionada;
       final optionsList = <mbm.PolylineAnnotationOptions>[];
 
-      debugPrint('🎨 Dibujando ${provider.polilineas.length} rutas.');
+      // 1. Separar rutas para dibujar la seleccionada AL FINAL (encima de todas)
+      final indices = List.generate(provider.polilineas.length, (index) => index);
+      
+      // Ordenar: primero las no seleccionadas, al final la seleccionada
+      indices.sort((a, b) {
+        final isSelA = selectedRuta != null && provider.rutas[a].id == selectedRuta.id;
+        final isSelB = selectedRuta != null && provider.rutas[b].id == selectedRuta.id;
+        if (isSelA) return 1;
+        if (isSelB) return -1;
+        return 0;
+      });
 
-      for (int i = 0; i < provider.polilineas.length; i++) {
+      for (int i in indices) {
         final fullPoints = provider.polilineas[i];
-        
-        // Verificación de selección por ID
         final isSelected = selectedRuta != null && provider.rutas[i].id == selectedRuta.id;
         
         double animValue = _routeAnimationController.isAnimating ? _routeAnimationController.value : 1.0;
@@ -305,9 +355,9 @@ class HomeMapViewState extends State<HomeMapView> with SingleTickerProviderState
         optionsList.add(mbm.PolylineAnnotationOptions(
           geometry: mbm.LineString(coordinates: points.map<mbm.Position>((p) => mbm.Position(p.longitude, p.latitude)).toList()),
           lineColor: const Color(0xFF2563EB).value,
-          lineWidth: isSelected ? 9.0 : 6.0, 
-          // Opacidad: 1.0 (seleccionada o si solo hay una), 0.22 (fantasma)
-          lineOpacity: isSelected || (selectedRuta == null && i == 0) ? 1.0 : 0.22,
+          lineWidth: isSelected ? 10.0 : 6.0, 
+          // Opacidad: 1.0 para la principal/seleccionada, 0.20 para las demás
+          lineOpacity: isSelected || (selectedRuta == null && i == 0) ? 1.0 : 0.20,
           lineJoin: mbm.LineJoin.ROUND,
         ));
       }

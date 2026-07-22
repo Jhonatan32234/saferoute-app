@@ -7,7 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../domain/repositories/reporte_repository.dart';
 import 'reporte_state.dart';
 
-@injectable
+@lazySingleton
 class ReporteProvider extends ChangeNotifier {
   final IReporteRepository _repository;
   final FlutterSecureStorage _storage;
@@ -139,6 +139,11 @@ class ReporteProvider extends ChangeNotifier {
     } finally {
       notifyListeners();
     }
+  }
+
+  void resetTotal() {
+    _state = const ReporteInitial();
+    notifyListeners();
   }
 
   @override

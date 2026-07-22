@@ -14,7 +14,7 @@ import 'package:saferoute_app/features/home/domain/entities/ruta_entity.dart';
 import 'package:saferoute_app/features/home/domain/entities/destino_reciente_entity.dart';
 import 'mapa_state.dart';
 
-@injectable
+@lazySingleton
 class MapaProvider extends ChangeNotifier {
   final IHomeRepository homeRepository;
   final DotEnv _dotenv;
@@ -221,6 +221,20 @@ class MapaProvider extends ChangeNotifier {
     _destinoBusqueda = null;
     _textoOrigen = '';
     _textoDestino = '';
+    // No limpiamos _destinosRecientes aquí para que persista el historial en el panel
+    notifyListeners();
+  }
+
+  void resetTotal() {
+    _state = const MapaInitial();
+    _origenBusqueda = null;
+    _destinoBusqueda = null;
+    _textoOrigen = '';
+    _textoDestino = '';
+    _destinosRecientes = [];
+    _userId = '';
+    _zonaInicializada = false;
+    _limpiarViaje();
     notifyListeners();
   }
 
@@ -267,14 +281,25 @@ class MapaProvider extends ChangeNotifier {
 
       try {
         await homeRepository.guardarDestinoReciente(
-          nombre: _textoDestino,
+          nombre: _textoDestino.isEmpty ? "Destino seleccionado" : _textoDestino,
           lat: _destinoBusqueda!.latitude,
           lon: _destinoBusqueda!.longitude,
         );
-        cargarDestinosRecientes();
       } catch (e) {
-        debugPrint("Error guardando destino en API: $e");
+        debugPrint("API historial falló, guardando local: $e");
+        // Fallback local: agregar a la lista actual si falla la API
+        final nuevoDestino = DestinoReciente(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          nombre: _textoDestino.isEmpty ? "Destino seleccionado" : _textoDestino,
+          lat: _destinoBusqueda!.latitude,
+          lon: _destinoBusqueda!.longitude,
+          fecha: DateTime.now(),
+        );
+        _destinosRecientes.insert(0, nuevoDestino);
       }
+      
+      // Forzar recarga (que ahora tiene el fallback local que implementé arriba)
+      await cargarDestinosRecientes();
 
       _conectarWebSocket();
 
@@ -363,6 +388,7 @@ class MapaProvider extends ChangeNotifier {
 
       if (exito) {
         _limpiarViaje();
+        await cargarDestinosRecientes(); // ✅ Recargar historial al finalizar viaje
         return true;
       }
       _state = oldState; // Restaurar si falla
@@ -396,9 +422,21 @@ class MapaProvider extends ChangeNotifier {
     _cargandoDestinos = true;
     notifyListeners();
     try {
+      // 1. Intentar cargar de la API
       _destinosRecientes = await homeRepository.getDestinosRecientes();
+      
+      // 2. Guardar en local como respaldo
+      final jsonList = _destinosRecientes.map((e) => e.toJson()).toList();
+      await _storage.write(key: 'destinos_recientes_cache', value: jsonEncode(jsonList));
+      
     } catch (e) {
-      debugPrint("Error cargando destinos recientes: $e");
+      debugPrint("⚠️ API historial falló, cargando desde cache local: $e");
+      // 3. Fallback a local si la API falla
+      final cached = await _storage.read(key: 'destinos_recientes_cache');
+      if (cached != null) {
+        final List decoded = jsonDecode(cached);
+        _destinosRecientes = decoded.map((j) => DestinoReciente.fromJson(j)).toList();
+      }
     } finally {
       _cargandoDestinos = false;
       notifyListeners();
@@ -407,9 +445,15 @@ class MapaProvider extends ChangeNotifier {
 
   Future<void> eliminarDestinoReciente(String id) async {
     try {
-      await homeRepository.eliminarDestinoReciente(id);
       _destinosRecientes.removeWhere((d) => d.id == id);
       notifyListeners();
+      
+      // Intentar borrar en servidor
+      await homeRepository.eliminarDestinoReciente(id);
+      
+      // Actualizar cache local
+      final jsonList = _destinosRecientes.map((e) => e.toJson()).toList();
+      await _storage.write(key: 'destinos_recientes_cache', value: jsonEncode(jsonList));
     } catch (e) {
       debugPrint("Error eliminando destino: $e");
     }

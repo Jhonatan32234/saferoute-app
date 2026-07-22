@@ -3,7 +3,7 @@ import 'package:injectable/injectable.dart';
 import '../../domain/entities/profile_entity.dart';
 import '../../domain/repositories/profile_repository.dart';
 
-@injectable
+@lazySingleton
 class ProfileProvider extends ChangeNotifier {
   final IProfileRepository _repository;
 
@@ -50,5 +50,12 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void resetTotal() {
+    _profile = null;
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
   }
 }

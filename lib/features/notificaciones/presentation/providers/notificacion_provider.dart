@@ -8,7 +8,7 @@ import '../../../../core/network/session_service.dart';
 import '../../domain/entities/notificacion_entity.dart';
 import '../../domain/repositories/notification_repository.dart';
 
-@injectable
+@lazySingleton
 class NotificacionProvider extends ChangeNotifier {
   final INotificacionRepository repository;
   final SessionService _sessionService;
@@ -41,7 +41,6 @@ class NotificacionProvider extends ChangeNotifier {
 
   void _iniciarRefrescoHistorial() {
     _historialRefreshTimer?.cancel();
-    cargarHistorial();
     _historialRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       cargarHistorial();
     });
@@ -69,6 +68,11 @@ class NotificacionProvider extends ChangeNotifier {
     try {
       _notificaciones = await repository.getHistorial();
       notifyListeners();
+      
+      // Si no hay un timer activo, lo iniciamos al cargar el historial exitosamente
+      if (_historialRefreshTimer == null || !_historialRefreshTimer!.isActive) {
+        _iniciarRefrescoHistorial();
+      }
     } catch (e) {
       debugPrint("❌ Error cargando historial: $e");
     }
@@ -182,6 +186,15 @@ class NotificacionProvider extends ChangeNotifier {
   void desconectarRuta() {
     _currentRutaId = null;
     _desconectarWS();
+    notifyListeners();
+  }
+
+  void resetTotal() {
+    desconectarRuta();
+    _notificaciones = [];
+    _alertasMapa = [];
+    _ultimaAlertaUrgente = null;
+    _historialRefreshTimer?.cancel();
     notifyListeners();
   }
 

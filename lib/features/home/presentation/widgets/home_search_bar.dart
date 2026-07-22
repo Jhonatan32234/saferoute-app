@@ -47,8 +47,8 @@ class HomeSearchBar extends StatelessWidget {
               ),
             ),
             Container(
-              width: 32.r,
-              height: 32.r,
+              width: 36.r,
+              height: 36.r,
               decoration: const BoxDecoration(
                 color: Color(0xFFEFF6FF),
                 shape: BoxShape.circle,
@@ -56,7 +56,7 @@ class HomeSearchBar extends StatelessWidget {
               child: Icon(
                 Icons.near_me_rounded,
                 color: const Color(0xFF2563EB),
-                size: 18.r,
+                size: 20.r,
               ),
             ),
           ],

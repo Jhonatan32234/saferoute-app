@@ -47,6 +47,7 @@ class RutaModel extends RutaEntity {
       if (point is! List || point.length < 2) continue;
       
       // Multiplicamos por 1e5 (precisión 5) que es lo que espera tu API de Go
+      // La API envía [latitude, longitude] en geometria_osrm
       int lat = (point[0] * 1e5).round();
       int lng = (point[1] * 1e5).round();
 

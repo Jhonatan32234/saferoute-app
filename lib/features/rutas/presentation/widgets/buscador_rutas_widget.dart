@@ -36,20 +36,38 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
+    _debounce = Timer(const Duration(milliseconds: 600), () async {
       if (query.length < 3) {
-        setState(() => _sugerencias = []);
+        setState(() {
+          _sugerencias = [];
+          _estaBuscando = false;
+        });
         return;
       }
       
-      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$query,chiapas&format=json&limit=5');
+      setState(() => _estaBuscando = true);
+      
+      // Búsqueda BLINDADA a Chiapas usando Viewbox y Bounded=1
+      // Coordenadas aproximadas de Chiapas: -94.2, 17.6 (NW) y -90.3, 14.5 (SE)
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=10&viewbox=-94.2,17.6,-90.3,14.5&bounded=1&countrycodes=mx&addressdetails=1');
+      
       try {
-        final response = await http.get(url, headers: {'User-Agent': 'SafeRouteApp'});
+        final response = await http.get(url, headers: {
+          'User-Agent': 'SafeRoute_App_Final_${DateTime.now().millisecondsSinceEpoch}',
+          'Accept-Language': 'es'
+        });
+        
         if (response.statusCode == 200) {
-          setState(() => _sugerencias = jsonDecode(response.body));
+          if (mounted) {
+            setState(() {
+              _sugerencias = jsonDecode(response.body);
+              _estaBuscando = false;
+            });
+          }
         }
       } catch (e) {
-        debugPrint("Error buscando: $e");
+        debugPrint("❌ Error en sugerencias: $e");
+        if (mounted) setState(() => _estaBuscando = false);
       }
     });
   }
@@ -58,52 +76,30 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
     final queryText = _destinoController.text.trim();
     if (queryText.isEmpty) return;
     
-    setState(() => _estaBuscando = true);
-    
-    if (_sugerencias.isNotEmpty) {
-      final first = _sugerencias.first;
-      await _seleccionarDestino(
-        first['display_name'].toString().split(',')[0],
-        double.parse(first['lat']),
-        double.parse(first['lon']),
-      );
-    } else {
-      final queryLower = queryText.toLowerCase();
-      final cityEntry = AppConstants.ciudades.entries.cast<MapEntry<String, Map<String, double>>?>().firstWhere(
-        (e) => e!.key.toLowerCase().contains(queryLower),
-        orElse: () => null,
-      );
-      
-      if (cityEntry != null) {
-        await _seleccionarDestino(cityEntry.key, cityEntry.value['lat']!, cityEntry.value['lon']!);
-      } else {
-        try {
-          final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$queryText,chiapas&format=json&limit=1');
-          final response = await http.get(url, headers: {'User-Agent': 'SafeRouteApp'}).timeout(const Duration(seconds: 15));
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            if (data is List && data.isNotEmpty) {
-              await _seleccionarDestino(
-                data[0]['display_name'].toString().split(',')[0],
-                double.parse(data[0]['lat']),
-                double.parse(data[0]['lon']),
-              );
-              if (mounted) setState(() => _estaBuscando = false);
-              return;
-            }
-          }
-        } catch (e) {
-          debugPrint("Error en búsqueda forzada: $e");
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo encontrar la ubicación. Intenta ser más específico.')),
+    // Si no hay sugerencias seleccionadas pero hay texto, buscamos el primer resultado RELEVANTE en Chiapas
+    if (_sugerencias.isEmpty) {
+      setState(() => _estaBuscando = true);
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$queryText&format=json&limit=1&viewbox=-94.2,17.6,-90.3,14.5&bounded=1&countrycodes=mx');
+      try {
+        final response = await http.get(url, headers: {'User-Agent': 'SafeRoute_Manual'});
+        final data = jsonDecode(response.body);
+        if (data is List && data.isNotEmpty) {
+          await _seleccionarDestino(
+            data[0]['display_name'].toString().split(',')[0],
+            double.parse(data[0]['lat']),
+            double.parse(data[0]['lon']),
           );
+          return;
         }
+      } catch (_) {}
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ubicación no encontrada en Chiapas. Intenta elegir de la lista.')),
+        );
+        setState(() => _estaBuscando = false);
       }
     }
-    if (mounted) setState(() => _estaBuscando = false);
   }
 
   Future<void> _seleccionarDestino(String nombre, double lat, double lon) async {
@@ -159,6 +155,17 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                       hintText: 'Buscar destino...',
                       hintStyle: TextStyle(color: const Color(0xFF94A3B8), fontWeight: FontWeight.normal),
                       icon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                      suffixIcon: _estaBuscando 
+                        ? Padding(
+                            padding: EdgeInsets.all(12.r),
+                            child: SizedBox(width: 16.r, height: 16.r, child: const CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : (_destinoController.text.isNotEmpty 
+                            ? IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () {
+                                _destinoController.clear();
+                                setState(() => _sugerencias = []);
+                              }) 
+                            : null),
                       border: InputBorder.none,
                     ),
                     onChanged: _onSearchChanged,
@@ -169,18 +176,40 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
 
               if (_sugerencias.isNotEmpty)
                 Expanded(
-                  child: ListView.builder(
+                  child: ListView.separated(
                     itemCount: _sugerencias.length,
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                    separatorBuilder: (_, __) => SizedBox(height: 4.h),
                     itemBuilder: (context, i) {
                       final item = _sugerencias[i];
-                      return ListTile(
-                        leading: const Icon(Icons.location_on_outlined),
-                        title: Text(item['display_name'].toString().split(',')[0], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(item['display_name'], maxLines: 1, overflow: TextOverflow.ellipsis),
-                        onTap: () => _seleccionarDestino(
-                          item['display_name'].toString().split(',')[0],
-                          double.parse(item['lat']),
-                          double.parse(item['lon']),
+                      final name = item['display_name'].toString().split(',')[0];
+                      final full = item['display_name'].toString();
+                      
+                      return Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16.r),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                          leading: Container(
+                            width: 40.r, height: 40.r,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: const Icon(Icons.location_on_rounded, color: Color(0xFF3B82F6), size: 20),
+                          ),
+                          title: Text(
+                            name, 
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15.sp, color: const Color(0xFF1E293B), letterSpacing: -0.2)
+                          ),
+                          subtitle: Text(
+                            full, 
+                            maxLines: 1, 
+                            overflow: TextOverflow.ellipsis, 
+                            style: TextStyle(fontSize: 12.sp, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)
+                          ),
+                          onTap: () => _seleccionarDestino(name, double.parse(item['lat']), double.parse(item['lon'])),
                         ),
                       );
                     },
@@ -188,36 +217,114 @@ class _BuscadorRutasWidgetState extends State<BuscadorRutasWidget> {
                 )
               else
                 Expanded(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.near_me, color: Color(0xFF2563EB)),
-                        title: const Text('Usar ubicación actual', style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Como punto de destino'),
-                        onTap: () {},
-                      ),
-                      const Divider(),
-                      Expanded(
-                        child: ListView(
-                          children: AppConstants.ciudades.keys.map((name) {
-                            final coords = AppConstants.ciudades[name]!;
-                            return ListTile(
-                              leading: const Icon(Icons.history, color: Color(0xFF64748B)),
-                              title: Text(
-                                name, 
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0F172A),
-                                  fontSize: 16
-                                )
+                  child: Consumer<MapaProvider>(
+                    builder: (context, mapa, _) {
+                      final historial = mapa.destinosRecientes;
+
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.near_me, color: Color(0xFF2563EB)),
+                            title: const Text('Usar ubicación actual', style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Como punto de destino'),
+                            onTap: () {
+                              _seleccionarDestino(
+                                'Mi ubicación',
+                                mapa.ubicacionActual.latitude,
+                                mapa.ubicacionActual.longitude,
+                              );
+                            },
+                          ),
+                          const Divider(),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+                            child: Row(
+                              children: [
+                                Text(
+                                  historial.isEmpty ? 'SIN HISTORIAL' : 'DESTINOS RECIENTES',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF94A3B8),
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (historial.isEmpty)
+                            Expanded(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(20.r),
+                                      decoration: const BoxDecoration(color: Color(0xFFF8FAFC), shape: BoxShape.circle),
+                                      child: Icon(Icons.history_toggle_off_rounded, size: 40.r, color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    SizedBox(height: 16.h),
+                                    Text(
+                                      'Sin viajes recientes todavía',
+                                      style: TextStyle(color: const Color(0xFF64748B), fontWeight: FontWeight.w700, fontSize: 14.sp),
+                                    ),
+                                    Text(
+                                      'Tus destinos aparecerán aquí',
+                                      style: TextStyle(color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontSize: 12.sp),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              subtitle: const Text('Destino sugerido', style: TextStyle(color: Color(0xFF94A3B8))),
-                              onTap: () => _seleccionarDestino(name, coords['lat']!, coords['lon']!),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
+                            )
+                          else
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: historial.length,
+                                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                separatorBuilder: (_, __) => SizedBox(height: 4.h),
+                                itemBuilder: (context, index) {
+                                  final destino = historial[index];
+                                  return Material(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(16.r),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.only(left: 12.w, right: 4.w),
+                                      leading: Container(
+                                        width: 40.r, height: 40.r,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(12.r),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: const Icon(Icons.history_rounded, color: Color(0xFF64748B), size: 18),
+                                      ),
+                                      title: Text(
+                                        destino.nombre,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: const Color(0xFF1E293B),
+                                          fontSize: 15.sp,
+                                          letterSpacing: -0.2
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        'Viaje reciente', 
+                                        style: TextStyle(color: const Color(0xFF94A3B8), fontSize: 12.sp, fontWeight: FontWeight.w500)
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.close, size: 16, color: Color(0xFFCBD5E1)),
+                                        onPressed: () => mapa.eliminarDestinoReciente(destino.id),
+                                      ),
+                                      onTap: () => _seleccionarDestino(destino.nombre, destino.lat, destino.lon),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ),
 
